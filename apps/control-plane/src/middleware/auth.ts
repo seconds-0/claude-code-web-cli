@@ -1,14 +1,43 @@
 import type { Context, Next } from "hono";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
+// Cache the JWKS for Clerk
+let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
+
+function getJwks() {
+  if (!jwks) {
+    const issuer = process.env["CLERK_ISSUER_URL"];
+    if (!issuer) {
+      throw new Error("CLERK_ISSUER_URL environment variable is required");
+    }
+    // Clerk's JWKS endpoint
+    const jwksUrl = new URL("/.well-known/jwks.json", issuer);
+    jwks = createRemoteJWKSet(jwksUrl);
+  }
+  return jwks;
+}
+
+interface ClerkJwtPayload {
+  sub: string; // Clerk user ID
+  iss: string; // Issuer
+  aud: string; // Audience (optional)
+  exp: number; // Expiration
+  iat: number; // Issued at
+  nbf: number; // Not before
+  azp?: string; // Authorized party (client ID)
+}
 
 /**
  * Auth middleware that validates Bearer tokens.
- * In production, this verifies JWT with Clerk JWKS.
+ * Verifies JWT with Clerk JWKS.
  * For testing, can be mocked via SKIP_AUTH env var.
  */
 export async function authMiddleware(c: Context, next: Next) {
   // Skip auth in test mode when explicitly disabled
   if (process.env["SKIP_AUTH"] === "true") {
-    c.set("userId", "test-user-id");
+    // Allow tests to pass a user ID via header
+    const testUserId = c.req.header("X-Test-User-Id") || "test-user-id";
+    c.set("userId", testUserId);
     return next();
   }
 
@@ -28,12 +57,38 @@ export async function authMiddleware(c: Context, next: Next) {
     return c.json({ error: "unauthorized", message: "Missing token" }, 401);
   }
 
-  // TODO: In production, verify JWT with Clerk JWKS
-  // For now, just check token is present (will be replaced with real validation)
-  // This allows tests to pass a dummy token
+  try {
+    const jwksSet = getJwks();
+    const issuer = process.env["CLERK_ISSUER_URL"];
 
-  // Set user context for downstream handlers
-  c.set("userId", "placeholder-user-id");
+    const { payload } = await jwtVerify(token, jwksSet, {
+      issuer,
+      // Clerk tokens don't always have audience, so we don't verify it
+    });
 
-  return next();
+    const clerkPayload = payload as unknown as ClerkJwtPayload;
+
+    if (!clerkPayload.sub) {
+      return c.json({ error: "unauthorized", message: "Invalid token: missing subject" }, 401);
+    }
+
+    // Set user context for downstream handlers
+    c.set("userId", clerkPayload.sub);
+
+    return next();
+  } catch (error) {
+    console.error("JWT verification failed:", error);
+
+    // Check for specific error types
+    if (error instanceof Error) {
+      if (error.message.includes("expired")) {
+        return c.json({ error: "unauthorized", message: "Token expired" }, 401);
+      }
+      if (error.message.includes("signature")) {
+        return c.json({ error: "unauthorized", message: "Invalid token signature" }, 401);
+      }
+    }
+
+    return c.json({ error: "unauthorized", message: "Invalid token" }, 401);
+  }
 }
