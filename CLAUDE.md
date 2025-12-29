@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Claude Code Cloud - a cloud development environment service with real terminal access, persistent filesystems, and voice-first interaction. Two relationship modes:
+
 - **Guided mode:** Claude drives decisions; user provides intent
 - **Engineer mode:** User drives; Claude assists; terminal-first
 
@@ -25,6 +26,7 @@ Backup/Export (Cloudflare R2)
 ## Tech Stack
 
 ### Control Plane
+
 - **Runtime:** Node.js + TypeScript
 - **Framework:** Hono (REST + WebSocket)
 - **Database:** Postgres (Neon) with Drizzle ORM
@@ -34,6 +36,7 @@ Backup/Export (Cloudflare R2)
 - **Hosting:** Fly.io (gateway), Vercel (web)
 
 ### Data Plane (User Compute)
+
 - **Compute:** Hetzner Cloud servers from Packer snapshots
 - **Persistence:** Hetzner Volumes (not S3 mounts - object storage is backup only)
 - **Terminal:** ttyd with `--writable` and `--url-arg` flags
@@ -41,23 +44,28 @@ Backup/Export (Cloudflare R2)
 - **Networking:** Tailscale private overlay (no public box ports)
 
 ### Clients
+
 - **Web:** Next.js App Router
 - **Mobile:** Expo (note: use `expo-audio`, NOT deprecated `expo-av`)
 
 ## Key Implementation Details
 
 ### Terminal Notifications
+
 Use `tmux pipe-pane` to capture pane output - do NOT rely on tmux `history-file` which doesn't produce scrollback files by default.
 
 ### Voice Integration
+
 - **Web:** Direct Deepgram WebSocket using `Sec-WebSocket-Protocol` header for auth
 - **Mobile:** Real streaming capture, not deprecated expo-av
 
 ### Persistence Tiers
+
 - **Suspend tier:** Files persist, processes do not
 - **Always-on tier:** VM stays running, tmux and background tasks persist
 
 ### Security Model
+
 - Boxes have no public inbound exposure
 - All access through gateway over Tailscale
 - Short-lived session tokens
@@ -90,17 +98,23 @@ pnpm typecheck        # TypeScript check
 pnpm format           # Prettier format
 ```
 
+## Git & GitHub
+
+- **GitHub account:** Always use the `seconds-0` account for `gh` CLI operations
+- **Commit signing:** Skip key signing - use `git commit --no-gpg-sign` or `git -c commit.gpgsign=false commit`
+
 ## Testing Strategy
 
 **Tiered approach for fast feedback:**
 
-| Tier | Location | When | Purpose |
-|------|----------|------|---------|
-| Core | `tests/core/` | Pre-commit | ~20 critical path tests, <5s total |
-| Unit | `tests/unit/` | CI | Full unit coverage |
-| Integration | `tests/integration/` | CI | API integration tests |
+| Tier        | Location             | When       | Purpose                            |
+| ----------- | -------------------- | ---------- | ---------------------------------- |
+| Core        | `tests/core/`        | Pre-commit | ~20 critical path tests, <5s total |
+| Unit        | `tests/unit/`        | CI         | Full unit coverage                 |
+| Integration | `tests/integration/` | CI         | API integration tests              |
 
 **Core tests MUST include:**
+
 - Health endpoint responds
 - Auth middleware rejects invalid tokens
 - DB connection works
@@ -109,14 +123,17 @@ pnpm format           # Prettier format
 ## Quality Gates
 
 **Pre-commit (fast):**
+
 - `pnpm lint-staged` - lint changed files
 - `pnpm typecheck` - TypeScript
 - `pnpm test:core` - core smoke tests
 
 **Post-commit (thorough):**
+
 - `codex exec "Review git diff HEAD~1..."` - deep code review
 
 **CI (comprehensive):**
+
 - Full lint, typecheck, test suite
 - Build verification
 
