@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# Run lint-staged for formatting and linting
+pnpm lint-staged
+
+# Run typecheck
+pnpm typecheck
+
+# Run core tests (fast, <5s)
+pnpm test:core
