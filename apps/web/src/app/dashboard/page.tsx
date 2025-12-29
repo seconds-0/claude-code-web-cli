@@ -1,5 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
+import StatusBadge from "@/components/StatusBadge";
+import Panel, { PanelContent } from "@/components/Panel";
 
 interface Workspace {
   id: string;
@@ -35,43 +37,6 @@ async function getWorkspaces(token: string): Promise<Workspace[]> {
   }
 }
 
-function getStatusColor(status: string): string {
-  switch (status) {
-    case "ready":
-    case "running":
-      return "var(--success)";
-    case "provisioning":
-    case "starting":
-      return "var(--warning)";
-    case "pending":
-    case "stopping":
-    case "suspended":
-    case "stopped":
-      return "var(--muted)";
-    default:
-      return "var(--muted)";
-  }
-}
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "0.25rem 0.5rem",
-        borderRadius: "0.25rem",
-        fontSize: "0.75rem",
-        fontWeight: 500,
-        textTransform: "uppercase",
-        background: `${getStatusColor(status)}20`,
-        color: getStatusColor(status),
-      }}
-    >
-      {status}
-    </span>
-  );
-}
-
 export default async function DashboardPage() {
   const { getToken } = await auth();
   const token = await getToken();
@@ -79,47 +44,81 @@ export default async function DashboardPage() {
   const workspaces = token ? await getWorkspaces(token) : [];
 
   return (
-    <div className="container" style={{ paddingTop: "2rem" }}>
-      <header
+    <div style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
+      {/* Page Header */}
+      <div
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "flex-start",
           marginBottom: "2rem",
         }}
       >
-        <h1 style={{ fontSize: "1.75rem" }}>Workspaces</h1>
+        <div>
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "0.625rem",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              color: "var(--muted)",
+              marginBottom: "0.5rem",
+            }}
+          >
+            CTRL.01 / WORKSPACE_MANAGER
+          </div>
+          <h1
+            style={{
+              fontSize: "1.75rem",
+              fontWeight: 700,
+              letterSpacing: "-0.03em",
+            }}
+          >
+            Workspaces
+          </h1>
+        </div>
         <Link href="/dashboard/new">
-          <button>New Workspace</button>
+          <button className="primary">+ New Workspace</button>
         </Link>
-      </header>
+      </div>
 
       {workspaces.length === 0 ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "4rem 2rem",
-            background: "var(--secondary)",
-            borderRadius: "0.75rem",
-            border: "1px solid var(--border)",
-          }}
-        >
-          <h2 style={{ marginBottom: "0.5rem" }}>No workspaces yet</h2>
-          <p style={{ color: "var(--muted)", marginBottom: "1.5rem" }}>
-            Create your first workspace to get started with Claude Code Cloud.
-          </p>
-          <Link href="/dashboard/new">
-            <button>Create Workspace</button>
-          </Link>
-        </div>
+        <Panel label="INIT.00" title="No Workspaces">
+          <PanelContent
+            style={{
+              textAlign: "center",
+              padding: "3rem 2rem",
+            }}
+            className="dot-grid"
+          >
+            <div
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: "0.75rem",
+                color: "var(--muted)",
+                marginBottom: "1rem",
+              }}
+            >
+              NO_INSTANCES_FOUND
+            </div>
+            <p style={{ marginBottom: "1.5rem", color: "var(--muted)" }}>
+              Create your first workspace to initialize a cloud dev environment.
+            </p>
+            <Link href="/dashboard/new">
+              <button className="primary">Initialize Workspace</button>
+            </Link>
+          </PanelContent>
+        </Panel>
       ) : (
         <div
           style={{
             display: "grid",
-            gap: "1rem",
+            gap: "1px",
+            background: "var(--border)",
+            border: "1px solid var(--border)",
           }}
         >
-          {workspaces.map((workspace) => (
+          {workspaces.map((workspace, index) => (
             <Link
               key={workspace.id}
               href={`/dashboard/workspace/${workspace.id}`}
@@ -127,41 +126,103 @@ export default async function DashboardPage() {
             >
               <div
                 style={{
-                  background: "var(--secondary)",
+                  background: "var(--surface)",
                   padding: "1.25rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--border)",
                   cursor: "pointer",
-                  transition: "border-color 0.2s",
+                  transition: "background var(--transition)",
                 }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-hover)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "var(--surface)")}
               >
                 <div
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "flex-start",
-                    marginBottom: "0.5rem",
                   }}
                 >
-                  <h3 style={{ fontSize: "1.125rem" }}>{workspace.name}</h3>
-                  <StatusBadge status={workspace.status} />
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "1rem",
-                    color: "var(--muted)",
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  <span>Created {new Date(workspace.createdAt).toLocaleDateString()}</span>
-                  {workspace.instance && <span>Instance: {workspace.instance.status}</span>}
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.75rem",
+                        marginBottom: "0.5rem",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: "0.625rem",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.1em",
+                          color: "var(--primary)",
+                        }}
+                      >
+                        WS.{String(index + 1).padStart(2, "0")}
+                      </span>
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          fontSize: "1rem",
+                        }}
+                      >
+                        {workspace.name}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: "0.75rem",
+                        color: "var(--muted)",
+                      }}
+                    >
+                      Created {new Date(workspace.createdAt).toLocaleDateString()} •{" "}
+                      <span style={{ fontFamily: "var(--font-mono)" }}>
+                        {workspace.id.slice(0, 8)}
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "0.5rem",
+                      alignItems: "center",
+                    }}
+                  >
+                    <StatusBadge status={workspace.status} />
+                    {workspace.instance && (
+                      <StatusBadge
+                        status={workspace.instance.status}
+                        label={`VM:${workspace.instance.status}`}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             </Link>
           ))}
         </div>
       )}
+
+      {/* Footer stats */}
+      <div
+        style={{
+          marginTop: "2rem",
+          display: "flex",
+          justifyContent: "space-between",
+          fontFamily: "var(--font-mono)",
+          fontSize: "0.625rem",
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          color: "var(--muted)",
+        }}
+      >
+        <span>
+          TOTAL: {workspaces.length} WORKSPACE{workspaces.length !== 1 ? "S" : ""}
+        </span>
+        <span>ACTIVE: {workspaces.filter((w) => w.instance?.status === "running").length}</span>
+      </div>
     </div>
   );
 }

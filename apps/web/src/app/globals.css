@@ -1,17 +1,45 @@
+/* ============================================
+   CLAUDE CODE CLOUD - Design System
+   Inspired by teenage.engineering
+   "Industrial Precision Tool" Aesthetic
+   ============================================ */
+
+/* Fonts loaded via next/font in layout.tsx for better performance */
+
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --secondary: #1f2937;
-  --border: #374151;
-  --muted: #6b7280;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --error: #ef4444;
+  /* ========== BASE COLORS (The Shell) ========== */
+  --background: #0D0D0D;
+  --surface: #1A1A1A;
+  --surface-hover: #262626;
+  --foreground: #E5E5E5;
+  --muted: #808080;
+  --border: #333333;
+  --border-strong: #4D4D4D;
+
+  /* ========== SIGNAL COLORS ========== */
+  --primary: #FF4D00;
+  --primary-hover: #FF6A2A;
+  --selection: #0055FF;
+  --success: #00B341;
+  --warning: #FFCC00;
+  --error: #FF3333;
+
+  /* ========== TYPOGRAPHY ========== */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+
+  /* ========== SPECS ========== */
+  --radius: 0px;
+  --shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 1px 1px 0px rgba(0, 0, 0, 0.2);
+  --transition-fast: 0.05s ease;
+  --transition: 0.1s ease;
 }
 
-* {
+/* ========== RESET ========== */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -26,20 +54,35 @@ body {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    "Fira Sans",
-    "Droid Sans",
-    "Helvetica Neue",
-    sans-serif;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: -0.02em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ========== TYPOGRAPHY ========== */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 1.75rem;
+}
+
+h3 {
+  font-size: 1.25rem;
+}
+
+p {
+  color: var(--muted);
 }
 
 a {
@@ -47,29 +90,436 @@ a {
   text-decoration: none;
 }
 
-button {
-  cursor: pointer;
-  border: none;
-  background: var(--primary);
-  color: white;
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
-  font-size: 1rem;
+/* ========== TECHNICAL LABELS ========== */
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
   font-weight: 500;
-  transition: background 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
 }
 
-button:hover {
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* ========== BUTTONS ========== */
+button,
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--surface);
+  color: var(--foreground);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition);
+}
+
+button:hover,
+.btn:hover {
+  background: var(--surface-hover);
+}
+
+button:active,
+.btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+button:disabled,
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Primary Button */
+button.primary,
+.btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+button.primary:hover,
+.btn-primary:hover {
   background: var(--primary-hover);
 }
 
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+/* Ghost Button */
+button.ghost,
+.btn-ghost {
+  background: transparent;
+  border-color: var(--border);
+  box-shadow: none;
 }
 
+button.ghost:hover,
+.btn-ghost:hover {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+
+/* ========== INPUTS ========== */
+input,
+textarea,
+select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  transition: border-color var(--transition);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+/* ========== CARDS / PANELS ========== */
+.card,
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1.25rem;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ========== STATUS BADGES ========== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid currentColor;
+}
+
+.badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge-success {
+  color: var(--success);
+}
+
+.badge-warning {
+  color: var(--warning);
+}
+
+.badge-error {
+  color: var(--error);
+}
+
+.badge-muted {
+  color: var(--muted);
+}
+
+/* ========== TERMINAL ========== */
+.terminal-container {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+}
+
+.terminal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.terminal-screen {
+  background: #000000;
+  color: #00FF41;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  padding: 1rem;
+  min-height: 300px;
+}
+
+.terminal-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1.2em;
+  background: var(--primary);
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* ========== LAYOUT ========== */
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
+}
+
+.container-sm {
+  max-width: 600px;
+}
+
+.container-lg {
+  max-width: 1400px;
+}
+
+/* Grid */
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 768px) {
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Flex utilities */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.gap-1 { gap: 0.5rem; }
+.gap-2 { gap: 1rem; }
+.gap-3 { gap: 1.5rem; }
+.gap-4 { gap: 2rem; }
+
+/* ========== SPACING ========== */
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+.mt-4 { margin-top: 2rem; }
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
+.mb-4 { margin-bottom: 2rem; }
+
+/* ========== DIVIDERS ========== */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 1.5rem 0;
+}
+
+/* ========== LOADING STATES ========== */
+.loading-text {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.loading-text::after {
+  content: '';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: ''; }
+  40% { content: '.'; }
+  60% { content: '..'; }
+  80%, 100% { content: '...'; }
+}
+
+/* ========== LED PULSE (for active states) ========== */
+@keyframes led-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px currentColor; }
+  50% { opacity: 0.6; box-shadow: 0 0 2px currentColor; }
+}
+
+.led-pulse {
+  animation: led-pulse 1.5s ease-in-out infinite;
+}
+
+/* ========== DOT GRID BACKGROUND ========== */
+.dot-grid {
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ========== BOOT SEQUENCE ANIMATION ========== */
+@keyframes boot-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.boot-in {
+  animation: boot-in 0.2s ease-out forwards;
+}
+
+.boot-in-delay-1 { animation-delay: 0.05s; opacity: 0; }
+.boot-in-delay-2 { animation-delay: 0.1s; opacity: 0; }
+.boot-in-delay-3 { animation-delay: 0.15s; opacity: 0; }
+
+/* ========== SCANLINES (subtle CRT effect) ========== */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.1) 2px,
+    rgba(0, 0, 0, 0.1) 4px
+  );
+  pointer-events: none;
+}
+
+/* ========== COUNTER ANIMATION ========== */
+@keyframes counter {
+  0% { content: '0'; }
+  10% { content: '1'; }
+  20% { content: '2'; }
+  30% { content: '3'; }
+  40% { content: '4'; }
+  50% { content: '5'; }
+  60% { content: '6'; }
+  70% { content: '7'; }
+  80% { content: '8'; }
+  90% { content: '9'; }
+  100% { content: '0'; }
+}
+
+/* ========== LATCHING BUTTON (toggle/filter) ========== */
+button.latched,
+.btn-latched {
+  transform: translate(2px, 2px);
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.3);
+  background: var(--surface-hover);
+}
+
+/* ========== ROCKER SWITCH ========== */
+.rocker {
+  display: inline-flex;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  padding: 2px;
+}
+
+.rocker button {
+  padding: 0.5rem 0.75rem;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.rocker button:active {
+  transform: none;
+}
+
+.rocker button.active {
+  background: var(--primary);
+  color: white;
+}
+
+/* ========== TYPING CURSOR ========== */
+.typing-cursor::after {
+  content: '_';
+  animation: blink 1s step-end infinite;
+  color: var(--primary);
+}
+
+/* ========== FOCUS STATES ========== */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ========== SELECTION ========== */
+::selection {
+  background: var(--selection);
+  color: white;
 }

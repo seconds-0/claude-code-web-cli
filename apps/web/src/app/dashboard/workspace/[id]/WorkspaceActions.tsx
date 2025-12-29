@@ -56,9 +56,13 @@ export default function WorkspaceActions({
         <button
           onClick={() => performAction("start")}
           disabled={isLoading !== null}
-          style={{ background: "var(--success)" }}
+          className="primary"
+          style={{
+            background: "var(--success)",
+            borderColor: "var(--success)",
+          }}
         >
-          {isLoading === "start" ? "Starting..." : "Start"}
+          {isLoading === "start" ? <span className="loading-text">Starting</span> : "▶ Start"}
         </button>
       )}
 
@@ -66,9 +70,13 @@ export default function WorkspaceActions({
         <button
           onClick={() => performAction("stop")}
           disabled={isLoading !== null}
-          style={{ background: "var(--warning)" }}
+          style={{
+            background: "var(--warning)",
+            borderColor: "var(--warning)",
+            color: "var(--background)",
+          }}
         >
-          {isLoading === "stop" ? "Stopping..." : "Stop"}
+          {isLoading === "stop" ? <span className="loading-text">Stopping</span> : "■ Stop"}
         </button>
       )}
 
@@ -76,9 +84,9 @@ export default function WorkspaceActions({
         <button
           onClick={() => performAction("suspend")}
           disabled={isLoading !== null}
-          style={{ background: "var(--secondary)" }}
+          className="ghost"
         >
-          {isLoading === "suspend" ? "Suspending..." : "Suspend"}
+          {isLoading === "suspend" ? <span className="loading-text">Suspending</span> : "⏸ Suspend"}
         </button>
       )}
     </div>

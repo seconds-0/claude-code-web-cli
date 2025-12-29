@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import WorkspaceActions from "./WorkspaceActions";
 import Terminal from "@/components/Terminal";
+import StatusBadge from "@/components/StatusBadge";
+import { PanelStat } from "@/components/Panel";
 
 interface Workspace {
   id: string;
@@ -50,43 +52,6 @@ async function getWorkspace(id: string, token: string): Promise<Workspace | null
   }
 }
 
-function getStatusColor(status: string): string {
-  switch (status) {
-    case "ready":
-    case "running":
-      return "var(--success)";
-    case "provisioning":
-    case "starting":
-      return "var(--warning)";
-    case "pending":
-    case "stopping":
-    case "suspended":
-    case "stopped":
-      return "var(--muted)";
-    default:
-      return "var(--muted)";
-  }
-}
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "0.25rem 0.5rem",
-        borderRadius: "0.25rem",
-        fontSize: "0.75rem",
-        fontWeight: 500,
-        textTransform: "uppercase",
-        background: `${getStatusColor(status)}20`,
-        color: getStatusColor(status),
-      }}
-    >
-      {status}
-    </span>
-  );
-}
-
 export default async function WorkspaceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { getToken } = await auth();
@@ -111,14 +76,23 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
   const isTerminalReady = workspace.instance?.status === "running";
 
   return (
-    <div className="container" style={{ paddingTop: "2rem" }}>
+    <div style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
+      {/* Breadcrumb */}
       <div style={{ marginBottom: "1.5rem" }}>
-        <Link href="/dashboard" style={{ color: "var(--muted)", fontSize: "0.875rem" }}>
-          ← Back to Workspaces
+        <Link
+          href="/dashboard"
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.75rem",
+            color: "var(--muted)",
+          }}
+        >
+          ← WORKSPACES
         </Link>
       </div>
 
-      <header
+      {/* Header */}
+      <div
         style={{
           display: "flex",
           justifyContent: "space-between",
@@ -127,10 +101,36 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
         }}
       >
         <div>
-          <h1 style={{ fontSize: "1.75rem", marginBottom: "0.5rem" }}>{workspace.name}</h1>
-          <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "0.625rem",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              color: "var(--muted)",
+              marginBottom: "0.5rem",
+            }}
+          >
+            WS.{workspace.id.slice(0, 8).toUpperCase()} / CONTROL_PANEL
+          </div>
+          <h1
+            style={{
+              fontSize: "1.75rem",
+              fontWeight: 700,
+              letterSpacing: "-0.03em",
+              marginBottom: "0.75rem",
+            }}
+          >
+            {workspace.name}
+          </h1>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
             <StatusBadge status={workspace.status} />
-            {workspace.instance && <StatusBadge status={workspace.instance.status} />}
+            {workspace.instance && (
+              <StatusBadge
+                status={workspace.instance.status}
+                label={`VM:${workspace.instance.status}`}
+              />
+            )}
           </div>
         </div>
 
@@ -140,148 +140,137 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
           canStop={canStop}
           canSuspend={canSuspend}
         />
-      </header>
+      </div>
 
       {/* Terminal Section */}
-      <section
-        style={{
-          background: "var(--secondary)",
-          borderRadius: "0.75rem",
-          border: "1px solid var(--border)",
-          marginBottom: "2rem",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            padding: "1rem",
-            borderBottom: "1px solid var(--border)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <h2 style={{ fontSize: "1rem" }}>Terminal</h2>
-          {isTerminalReady && workspace.instance?.ipAddress && (
-            <span style={{ color: "var(--success)", fontSize: "0.875rem" }}>Connected</span>
+      <div className="terminal-container" style={{ marginBottom: "2rem" }}>
+        <div className="terminal-header">
+          <span>TERMINAL.01 / {workspace.name.toUpperCase().replace(/\s+/g, "_")}</span>
+          {isTerminalReady && workspace.instance?.ipAddress ? (
+            <span style={{ color: "var(--success)" }}>● CONNECTED</span>
+          ) : (
+            <span style={{ color: "var(--muted)" }}>○ OFFLINE</span>
           )}
         </div>
-        <div
-          style={{
-            height: "400px",
-            background: "#000",
-          }}
-        >
+        <div className="terminal-screen" style={{ height: "400px" }}>
           {isTerminalReady && workspace.instance?.ipAddress ? (
             <Terminal workspaceId={workspace.id} ipAddress={workspace.instance.ipAddress} />
           ) : (
             <div
               style={{
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
                 height: "100%",
-                color: "var(--muted)",
                 textAlign: "center",
               }}
             >
-              <div>
-                <p>Workspace is not running</p>
-                <p style={{ fontSize: "0.875rem", marginTop: "0.5rem" }}>
-                  Start the workspace to access the terminal
-                </p>
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "0.75rem",
+                  color: "var(--muted)",
+                  marginBottom: "1rem",
+                }}
+              >
+                AWAITING_CONNECTION
               </div>
+              <p style={{ color: "var(--muted)", marginBottom: "0.5rem" }}>
+                Workspace is not running
+              </p>
+              <p
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "0.75rem",
+                  color: "var(--muted)",
+                }}
+              >
+                Start the workspace to access terminal
+              </p>
             </div>
           )}
         </div>
-      </section>
+      </div>
 
-      {/* Info Section */}
-      <section
+      {/* Info Grid */}
+      <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-          gap: "1rem",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: "1px",
+          background: "var(--border)",
+          border: "1px solid var(--border)",
         }}
       >
-        <div
-          style={{
-            background: "var(--secondary)",
-            padding: "1.25rem",
-            borderRadius: "0.75rem",
-            border: "1px solid var(--border)",
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "0.875rem",
-              color: "var(--muted)",
-              marginBottom: "0.5rem",
-            }}
-          >
-            Storage
-          </h3>
-          <p style={{ fontSize: "1.25rem", fontWeight: 500 }}>
-            {workspace.volume?.sizeGb || 20} GB
-          </p>
-          <p style={{ fontSize: "0.875rem", color: "var(--muted)" }}>
-            {workspace.volume?.status || "pending"}
-          </p>
+        <div style={{ background: "var(--surface)" }}>
+          <PanelStat
+            label="STORAGE"
+            value={`${workspace.volume?.sizeGb || 20} GB`}
+            subValue={workspace.volume?.status || "pending"}
+          />
         </div>
 
-        <div
-          style={{
-            background: "var(--secondary)",
-            padding: "1.25rem",
-            borderRadius: "0.75rem",
-            border: "1px solid var(--border)",
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "0.875rem",
-              color: "var(--muted)",
-              marginBottom: "0.5rem",
-            }}
-          >
-            Created
-          </h3>
-          <p style={{ fontSize: "1.25rem", fontWeight: 500 }}>
-            {new Date(workspace.createdAt).toLocaleDateString()}
-          </p>
-          <p style={{ fontSize: "0.875rem", color: "var(--muted)" }}>
-            {new Date(workspace.createdAt).toLocaleTimeString()}
-          </p>
+        <div style={{ background: "var(--surface)" }}>
+          <PanelStat
+            label="CREATED"
+            value={new Date(workspace.createdAt).toLocaleDateString()}
+            subValue={new Date(workspace.createdAt).toLocaleTimeString()}
+          />
         </div>
 
-        <div
-          style={{
-            background: "var(--secondary)",
-            padding: "1.25rem",
-            borderRadius: "0.75rem",
-            border: "1px solid var(--border)",
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "0.875rem",
-              color: "var(--muted)",
-              marginBottom: "0.5rem",
-            }}
-          >
-            Workspace ID
-          </h3>
-          <p
-            style={{
-              fontSize: "0.875rem",
-              fontFamily: "monospace",
-              wordBreak: "break-all",
-            }}
-          >
-            {workspace.id}
-          </p>
+        <div style={{ background: "var(--surface)" }}>
+          <PanelStat
+            label="LAST_UPDATED"
+            value={new Date(workspace.updatedAt).toLocaleDateString()}
+            subValue={new Date(workspace.updatedAt).toLocaleTimeString()}
+          />
         </div>
-      </section>
+
+        <div style={{ background: "var(--surface)" }}>
+          <div style={{ padding: "1rem" }}>
+            <div
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: "0.625rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                color: "var(--muted)",
+                marginBottom: "0.5rem",
+              }}
+            >
+              WORKSPACE_ID
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: "0.75rem",
+                wordBreak: "break-all",
+                color: "var(--foreground)",
+              }}
+            >
+              {workspace.id}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div
+        style={{
+          marginTop: "2rem",
+          display: "flex",
+          justifyContent: "space-between",
+          fontFamily: "var(--font-mono)",
+          fontSize: "0.625rem",
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          color: "var(--muted)",
+        }}
+      >
+        <span>IP: {workspace.instance?.ipAddress || "NOT_ASSIGNED"}</span>
+        <span>INSTANCE: {workspace.instance?.id?.slice(0, 8) || "NONE"}</span>
+      </div>
     </div>
   );
 }
