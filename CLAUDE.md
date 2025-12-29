@@ -63,19 +63,62 @@ Use `tmux pipe-pane` to capture pane output - do NOT rely on tmux `history-file`
 - Short-lived session tokens
 - Encrypted stored secrets
 
-## Monorepo Structure (Planned)
+## Monorepo Structure
 
 ```
 apps/
   control-plane/     # Hono API + WebSocket gateway
   web/               # Next.js App Router
-  mobile/            # Expo app (placeholder)
 packages/
   api-contract/      # Zod schemas + OpenAPI generator
   api-client/        # Generated typed client
+  db/                # Drizzle schema + migrations
   config/            # Shared TS/ESLint config
-box/                 # Per-user machine code (ttyd/tmux/agent)
+box/                 # Per-user machine code (Packer, scripts)
 ```
+
+## Development Commands
+
+```bash
+pnpm install          # Install dependencies
+pnpm dev              # Start all apps in dev mode
+pnpm build            # Build all packages
+pnpm test             # Run full test suite (CI)
+pnpm test:core        # Run core tests only (~20, <5s) - pre-commit
+pnpm lint             # ESLint
+pnpm typecheck        # TypeScript check
+pnpm format           # Prettier format
+```
+
+## Testing Strategy
+
+**Tiered approach for fast feedback:**
+
+| Tier | Location | When | Purpose |
+|------|----------|------|---------|
+| Core | `tests/core/` | Pre-commit | ~20 critical path tests, <5s total |
+| Unit | `tests/unit/` | CI | Full unit coverage |
+| Integration | `tests/integration/` | CI | API integration tests |
+
+**Core tests MUST include:**
+- Health endpoint responds
+- Auth middleware rejects invalid tokens
+- DB connection works
+- Critical business logic (1-2 per domain)
+
+## Quality Gates
+
+**Pre-commit (fast):**
+- `pnpm lint-staged` - lint changed files
+- `pnpm typecheck` - TypeScript
+- `pnpm test:core` - core smoke tests
+
+**Post-commit (thorough):**
+- `codex exec "Review git diff HEAD~1..."` - deep code review
+
+**CI (comprehensive):**
+- Full lint, typecheck, test suite
+- Build verification
 
 ## Reference Documentation
 
