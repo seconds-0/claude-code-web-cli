@@ -1,38 +1,73 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
+
+// Dynamically import XTerminal to avoid SSR issues with xterm.js
+const XTerminal = dynamic(() => import("./XTerminal"), {
+  ssr: false,
+  loading: () => (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100%",
+        color: "var(--muted)",
+      }}
+    >
+      Loading terminal...
+    </div>
+  ),
+});
 
 interface TerminalProps {
   workspaceId: string;
   ipAddress: string;
-  sessionToken?: string;
 }
 
-export default function Terminal({ workspaceId, ipAddress, sessionToken }: TerminalProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [isConnected, setIsConnected] = useState(false);
+export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // ttyd runs on the user box and is accessed through the gateway
-  // The gateway proxies WebSocket connections to the user's Tailscale IP
-  const gatewayUrl = process.env["NEXT_PUBLIC_GATEWAY_URL"] || "";
+  // Fetch session token from API
+  const fetchSessionToken = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const apiUrl = process.env["NEXT_PUBLIC_CONTROL_PLANE_URL"] || "http://localhost:8080";
+      const response = await fetch(`${apiUrl}/api/v1/workspaces/${workspaceId}/session`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || `Failed to get session token: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setSessionToken(data.token);
+    } catch (err) {
+      console.error("Failed to fetch session token:", err);
+      setError(err instanceof Error ? err.message : "Failed to connect to terminal");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [workspaceId]);
 
   useEffect(() => {
-    // For now, we'll use an iframe pointing to the ttyd instance
-    // In production, the gateway would proxy this connection securely
-    // with session token authentication
-
-    if (!ipAddress) {
-      setError("No IP address available");
-      return;
+    if (ipAddress) {
+      fetchSessionToken();
     }
+  }, [ipAddress, fetchSessionToken]);
 
-    // The ttyd URL would be proxied through the gateway in production
-    // Format: wss://gateway.domain/terminal/{workspaceId}?token={sessionToken}
-    setIsConnected(true);
-  }, [ipAddress, workspaceId, sessionToken]);
-
-  if (error) {
+  if (!ipAddress) {
     return (
       <div
         style={{
@@ -40,79 +75,106 @@ export default function Terminal({ workspaceId, ipAddress, sessionToken }: Termi
           alignItems: "center",
           justifyContent: "center",
           height: "100%",
-          color: "var(--error)",
+          color: "var(--muted)",
         }}
       >
-        {error}
+        Waiting for workspace IP...
       </div>
     );
   }
 
-  // In development, show a placeholder
-  // In production, this would be an iframe to the gateway's terminal proxy
-  // or we'd use xterm.js with a WebSocket connection
-  const terminalUrl = gatewayUrl
-    ? `${gatewayUrl}/terminal/${workspaceId}?token=${sessionToken || ""}`
-    : null;
-
-  return (
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        background: "#000",
-        position: "relative",
-      }}
-    >
-      {terminalUrl ? (
-        <iframe
-          ref={iframeRef}
-          src={terminalUrl}
-          style={{
-            width: "100%",
-            height: "100%",
-            border: "none",
-          }}
-          title={`Terminal for workspace ${workspaceId}`}
-        />
-      ) : (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            height: "100%",
-            color: "var(--muted)",
-            textAlign: "center",
-            padding: "2rem",
-          }}
-        >
+  if (isLoading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100%",
+          color: "var(--muted)",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
           <div
             style={{
-              fontFamily: "monospace",
-              fontSize: "0.875rem",
-              marginBottom: "1rem",
+              fontFamily: "var(--font-mono)",
+              fontSize: "0.75rem",
+              marginBottom: "0.5rem",
             }}
           >
-            <span style={{ color: "var(--success)" }}>$</span> claude-code
+            INITIALIZING_SESSION
           </div>
-          <p>Terminal connection ready</p>
-          <p style={{ fontSize: "0.875rem", marginTop: "0.5rem" }}>Workspace: {workspaceId}</p>
-          <p style={{ fontSize: "0.875rem", color: "var(--muted)" }}>IP: {ipAddress}</p>
-          {isConnected && (
-            <p
-              style={{
-                fontSize: "0.75rem",
-                marginTop: "1rem",
-                color: "var(--warning)",
-              }}
-            >
-              Configure NEXT_PUBLIC_GATEWAY_URL to enable live terminal
-            </p>
-          )}
+          <p>Connecting to workspace...</p>
         </div>
-      )}
-    </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100%",
+          color: "var(--error)",
+          textAlign: "center",
+          padding: "2rem",
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.75rem",
+            marginBottom: "0.5rem",
+          }}
+        >
+          CONNECTION_ERROR
+        </div>
+        <p style={{ marginBottom: "1rem" }}>{error}</p>
+        <button
+          onClick={fetchSessionToken}
+          style={{
+            padding: "0.5rem 1rem",
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.75rem",
+            background: "transparent",
+            border: "1px solid var(--border)",
+            color: "var(--foreground)",
+            cursor: "pointer",
+          }}
+        >
+          RETRY
+        </button>
+      </div>
+    );
+  }
+
+  if (!sessionToken) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100%",
+          color: "var(--muted)",
+        }}
+      >
+        No session token available
+      </div>
+    );
+  }
+
+  return (
+    <XTerminal
+      workspaceId={workspaceId}
+      sessionToken={sessionToken}
+      onConnect={() => console.log("Terminal connected")}
+      onDisconnect={() => console.log("Terminal disconnected")}
+      onError={(err) => setError(err)}
+    />
   );
 }
