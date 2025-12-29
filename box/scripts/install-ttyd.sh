@@ -1,6 +1,17 @@
 #!/bin/bash
 set -euo pipefail
 
+# SECURITY MODEL:
+# ttyd runs WITHOUT authentication because:
+# 1. It binds ONLY to tailscale0 interface (--interface tailscale0)
+# 2. The Tailscale network requires authentication to join
+# 3. Only our gateway can reach this endpoint over the Tailscale overlay
+# 4. The gateway validates session tokens before proxying requests
+# 5. Defense-in-depth: network isolation + gateway auth + session tokens
+#
+# This is intentional - adding basic auth here would be redundant and
+# would complicate the WebSocket proxy flow.
+
 echo "=== Installing ttyd ==="
 
 # ttyd version

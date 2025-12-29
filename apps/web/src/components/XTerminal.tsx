@@ -53,7 +53,8 @@ export default function XTerminal({
     if (!xtermRef.current) return;
 
     const wsUrl = getWsUrl();
-    console.log(`[XTerminal] Connecting to ${wsUrl}`);
+    // Log without token to avoid sensitive data in logs
+    console.log(`[XTerminal] Connecting to WebSocket for workspace ${workspaceId}`);
 
     setConnectionState("connecting");
 

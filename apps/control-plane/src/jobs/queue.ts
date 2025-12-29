@@ -45,6 +45,7 @@ export interface DestroyJob extends BaseJob {
   hetznerServerId?: string;
   hetznerVolumeId?: string;
   tailscaleDeviceId?: string;
+  deleteAfterDestroy?: boolean; // If true, delete DB record after successful cleanup
 }
 
 export type Job = ProvisionJob | DestroyJob;
@@ -125,6 +126,7 @@ export async function enqueueDestroyJob(params: {
   hetznerServerId?: string;
   hetznerVolumeId?: string;
   tailscaleDeviceId?: string;
+  deleteAfterDestroy?: boolean;
 }): Promise<DestroyJob> {
   const job: DestroyJob = {
     id: generateJobId(),
@@ -134,6 +136,7 @@ export async function enqueueDestroyJob(params: {
     hetznerServerId: params.hetznerServerId,
     hetznerVolumeId: params.hetznerVolumeId,
     tailscaleDeviceId: params.tailscaleDeviceId,
+    deleteAfterDestroy: params.deleteAfterDestroy,
     createdAt: new Date().toISOString(),
     attempts: 0,
   };
@@ -221,4 +224,49 @@ export async function getQueueJobs(queueName: QueueName): Promise<Job[]> {
  */
 export function isQueueConfigured(): boolean {
   return getRedisConfig() !== null;
+}
+
+/**
+ * Visibility timeout in milliseconds
+ * Jobs older than this in the processing queue are considered stale
+ */
+const VISIBILITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Recover stale jobs from the processing queue
+ *
+ * Jobs that have been in processing for longer than VISIBILITY_TIMEOUT_MS
+ * are assumed to be from crashed workers and are re-queued.
+ *
+ * Should be called periodically by the worker.
+ */
+export async function recoverStaleJobs(): Promise<number> {
+  const processingJobs = await getQueueJobs(QUEUE_NAMES.PROCESSING);
+  const now = Date.now();
+  let recovered = 0;
+
+  for (const job of processingJobs) {
+    const jobAge = now - new Date(job.createdAt).getTime();
+
+    // Check if job has been processing too long
+    // Note: This is approximate since we're using createdAt, not startedAt
+    // A more precise implementation would track startedAt separately
+    if (jobAge > VISIBILITY_TIMEOUT_MS && job.attempts > 0) {
+      console.log(`[queue] Recovering stale job ${job.id} (age: ${Math.round(jobAge / 1000)}s)`);
+
+      // Remove from processing queue
+      await redisCommand(["LREM", QUEUE_NAMES.PROCESSING, "1", JSON.stringify(job)]);
+
+      // Re-queue if under max attempts
+      if (job.attempts < 3) {
+        const queueName = job.type === "provision" ? QUEUE_NAMES.PROVISION : QUEUE_NAMES.DESTROY;
+        await redisCommand(["RPUSH", queueName, JSON.stringify(job)]);
+        recovered++;
+      } else {
+        console.log(`[queue] Job ${job.id} exceeded max attempts, discarding`);
+      }
+    }
+  }
+
+  return recovered;
 }

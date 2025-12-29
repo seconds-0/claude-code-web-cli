@@ -8,6 +8,7 @@ import {
   dequeueJob,
   completeJob,
   failJob,
+  recoverStaleJobs,
   QUEUE_NAMES,
   isQueueConfigured,
   type Job,
@@ -23,6 +24,7 @@ export type DestroyHandler = (job: DestroyJob) => Promise<void>;
 interface WorkerConfig {
   pollIntervalMs?: number;
   maxConcurrent?: number;
+  staleRecoveryIntervalMs?: number; // How often to check for stale jobs
   onError?: (error: Error, job?: Job) => void;
   onJobComplete?: (job: Job) => void;
 }
@@ -30,6 +32,7 @@ interface WorkerConfig {
 // Worker state
 let isRunning = false;
 let activeJobs = 0;
+let lastStaleRecovery = 0;
 let provisionHandler: ProvisionHandler | null = null;
 let destroyHandler: DestroyHandler | null = null;
 
@@ -110,7 +113,7 @@ async function pollQueue(queueName: QueueName, config: WorkerConfig): Promise<vo
  * Main worker loop
  */
 async function workerLoop(config: WorkerConfig): Promise<void> {
-  const { pollIntervalMs = 1000 } = config;
+  const { pollIntervalMs = 1000, staleRecoveryIntervalMs = 60000 } = config;
 
   while (isRunning) {
     // Poll both queues
@@ -118,6 +121,20 @@ async function workerLoop(config: WorkerConfig): Promise<void> {
       pollQueue(QUEUE_NAMES.PROVISION, config),
       pollQueue(QUEUE_NAMES.DESTROY, config),
     ]);
+
+    // Periodically recover stale jobs
+    const now = Date.now();
+    if (now - lastStaleRecovery > staleRecoveryIntervalMs) {
+      lastStaleRecovery = now;
+      try {
+        const recovered = await recoverStaleJobs();
+        if (recovered > 0) {
+          console.log(`[worker] Recovered ${recovered} stale jobs`);
+        }
+      } catch (error) {
+        console.error("[worker] Failed to recover stale jobs:", error);
+      }
+    }
 
     // Wait before next poll
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));

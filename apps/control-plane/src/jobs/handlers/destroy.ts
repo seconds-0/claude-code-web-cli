@@ -109,23 +109,31 @@ export async function handleDestroyJob(job: DestroyJob): Promise<void> {
       }
     }
 
-    // Step 5: Update database
-    await db
-      .update(workspaceInstances)
-      .set({
-        status: "stopped",
-        stoppedAt: new Date(),
-        hetznerServerId: null,
-        tailscaleIp: null,
-      })
-      .where(eq(workspaceInstances.workspaceId, workspaceId));
+    // Step 5: Update database or delete if requested
+    if (job.deleteAfterDestroy) {
+      // Full deletion requested - remove from database
+      console.log(`[destroy] Deleting workspace ${workspaceId} from database`);
+      await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
+      console.log(`[destroy] Workspace ${workspaceId} deleted completely`);
+    } else {
+      // Normal stop - just update status
+      await db
+        .update(workspaceInstances)
+        .set({
+          status: "stopped",
+          stoppedAt: new Date(),
+          hetznerServerId: null,
+          tailscaleIp: null,
+        })
+        .where(eq(workspaceInstances.workspaceId, workspaceId));
 
-    await db
-      .update(workspaces)
-      .set({ status: "suspended", updatedAt: new Date() })
-      .where(eq(workspaces.id, workspaceId));
+      await db
+        .update(workspaces)
+        .set({ status: "suspended", updatedAt: new Date() })
+        .where(eq(workspaces.id, workspaceId));
 
-    console.log(`[destroy] Workspace ${workspaceId} destroyed successfully`);
+      console.log(`[destroy] Workspace ${workspaceId} suspended successfully`);
+    }
   } catch (error) {
     console.error(`[destroy] Error destroying workspace ${workspaceId}:`, error);
 

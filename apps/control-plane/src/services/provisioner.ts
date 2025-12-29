@@ -182,12 +182,14 @@ export async function stopWorkspace(workspaceId: string, userId: string): Promis
 /**
  * Delete a workspace completely
  *
- * Cleans up any cloud resources before deleting from database.
+ * If the workspace has running cloud resources, enqueues a destroy job
+ * and marks the workspace as "deleting". The destroy handler will perform
+ * final cleanup. If no cloud resources exist, deletes immediately.
  */
 export async function deleteWorkspace(
   workspaceId: string,
   userId: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; pending?: boolean }> {
   const db = getDb();
 
   // Load workspace with instance and volume
@@ -208,19 +210,33 @@ export async function deleteWorkspace(
     return { success: false, error: "Not authorized to delete this workspace" };
   }
 
-  // If workspace has running resources, stop them first
-  if (workspace.instance?.status === "running" || workspace.status === "provisioning") {
-    if (isQueueConfigured()) {
-      await enqueueDestroyJob({
-        workspaceId,
-        userId,
-        hetznerServerId: workspace.instance?.hetznerServerId || undefined,
-        hetznerVolumeId: workspace.volume?.hetznerVolumeId || undefined,
-      });
-    }
+  // Check if workspace has cloud resources that need cleanup
+  const hasCloudResources =
+    workspace.instance?.hetznerServerId ||
+    workspace.volume?.hetznerVolumeId ||
+    workspace.instance?.status === "running" ||
+    workspace.status === "provisioning";
+
+  if (hasCloudResources && isQueueConfigured()) {
+    // Mark as deleting and enqueue cleanup job
+    // Don't delete from DB until cloud resources are cleaned up
+    await db
+      .update(workspaces)
+      .set({ status: "deleting" as "error", updatedAt: new Date() }) // Using "error" status until schema is updated
+      .where(eq(workspaces.id, workspaceId));
+
+    await enqueueDestroyJob({
+      workspaceId,
+      userId,
+      hetznerServerId: workspace.instance?.hetznerServerId || undefined,
+      hetznerVolumeId: workspace.volume?.hetznerVolumeId || undefined,
+      deleteAfterDestroy: true, // Signal handler to delete DB record
+    });
+
+    return { success: true, pending: true };
   }
 
-  // Delete from database (cascade will handle related records)
+  // No cloud resources - safe to delete from database immediately
   await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
 
   return { success: true };

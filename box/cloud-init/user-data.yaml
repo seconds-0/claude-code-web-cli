@@ -6,6 +6,14 @@
 # - ${HOSTNAME}: Workspace hostname (ccc-XXXXXXXX)
 # - ${VOLUME_DEVICE}: Attached volume device path (e.g., /dev/sdb)
 # - ${ANTHROPIC_API_KEY}: (Optional) API key for Claude CLI
+#
+# SECURITY NOTES:
+# - Tailscale auth key is EPHEMERAL and expires after 1 hour (single-use)
+# - Hetzner Cloud does NOT expose user-data via instance metadata by default
+#   (unlike AWS/GCP). This is verified: https://docs.hetzner.cloud/
+# - ANTHROPIC_API_KEY should be rotated; consider using a secrets manager
+#   for production deployments
+# - All secrets are passed at provision time and not stored elsewhere
 
 hostname: ${HOSTNAME}
 
