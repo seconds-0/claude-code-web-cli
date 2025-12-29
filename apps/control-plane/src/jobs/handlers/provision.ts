@@ -8,6 +8,16 @@
  * 4. Wait for server to be running
  * 5. Wait for Tailscale device to appear
  * 6. Update database with provisioned resources
+ *
+ * TRADE-OFF: Database operations are not wrapped in a transaction.
+ * This is acceptable because:
+ * 1. Provisioning is idempotent - failed jobs can be safely retried
+ * 2. Partial state is captured in workspace status ("provisioning", "error")
+ * 3. Cloud resources are tracked by hetznerServerId/hetznerVolumeId for cleanup
+ * 4. The job queue provides retry semantics with max attempts
+ * 5. Adding transactions would complicate error handling without clear benefit
+ *
+ * If strict atomicity becomes needed, use db.transaction() with proper rollback.
  */
 
 import { eq } from "drizzle-orm";

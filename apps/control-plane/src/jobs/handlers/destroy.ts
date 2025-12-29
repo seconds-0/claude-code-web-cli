@@ -7,6 +7,15 @@
  * 3. Delete Hetzner server
  * 4. Delete Tailscale device
  * 5. Update database
+ *
+ * TRADE-OFF: Each cleanup step continues even if previous steps fail.
+ * This is intentional to ensure maximum cleanup. Errors are logged but
+ * don't prevent subsequent cleanup attempts. This "best-effort" approach
+ * is preferred over strict atomicity because:
+ * 1. Partial cleanup is better than no cleanup (avoids orphaned resources)
+ * 2. Cloud resources have their own consistency guarantees
+ * 3. The job queue retries handle transient failures
+ * 4. Worst case: minor orphaned resources that can be cleaned up later
  */
 
 import { eq } from "drizzle-orm";

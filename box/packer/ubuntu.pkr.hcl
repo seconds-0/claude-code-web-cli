@@ -29,12 +29,12 @@ variable "image_name" {
 }
 
 source "hcloud" "ubuntu" {
-  token        = var.hcloud_token
-  image        = "ubuntu-22.04"
-  location     = var.location
-  server_type  = var.server_type
-  server_name  = "packer-ccc-builder"
-  ssh_username = "root"
+  token         = var.hcloud_token
+  image         = "ubuntu-22.04"
+  location      = var.location
+  server_type   = var.server_type
+  server_name   = "packer-ccc-builder"
+  ssh_username  = "root"
   snapshot_name = "${var.image_name}-${formatdate("YYYYMMDD-HHmmss", timestamp())}"
   snapshot_labels = {
     "app"     = "claude-code-cloud"

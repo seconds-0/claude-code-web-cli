@@ -221,7 +221,15 @@ export class TailscaleService {
   /**
    * Get a device by its hostname
    *
-   * Returns the first device matching the hostname, or null if not found
+   * Returns the first device matching the hostname, or null if not found.
+   *
+   * TRADE-OFF: Hostname lookup is not guaranteed unique. We generate hostnames
+   * from workspace UUIDs (ccc-XXXXXXXX where X is first 8 hex chars), so the
+   * collision probability is ~1 in 4 billion. This is acceptable because:
+   * 1. Workspaces are scoped to a single tailnet
+   * 2. Storing tailscale device IDs would require a schema migration
+   * 3. Collisions would only affect cleanup, not security
+   * If this becomes an issue, store tailscaleDeviceId in workspace_instances table.
    */
   async getDeviceByHostname(hostname: string): Promise<TailscaleDevice | null> {
     const { devices } = await this.listDevices();
