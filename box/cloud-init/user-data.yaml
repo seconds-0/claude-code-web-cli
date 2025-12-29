@@ -1,0 +1,95 @@
+#cloud-config
+# CCC Workspace Cloud-Init Template
+#
+# Variables to substitute:
+# - ${TAILSCALE_AUTH_KEY}: Ephemeral Tailscale auth key
+# - ${HOSTNAME}: Workspace hostname (ccc-XXXXXXXX)
+# - ${VOLUME_DEVICE}: Attached volume device path (e.g., /dev/sdb)
+# - ${ANTHROPIC_API_KEY}: (Optional) API key for Claude CLI
+
+hostname: ${HOSTNAME}
+
+# Ensure hostname is preserved
+preserve_hostname: false
+manage_etc_hosts: true
+
+# Set timezone
+timezone: UTC
+
+# Run commands on first boot
+runcmd:
+  # Connect to Tailscale network
+  - echo "Connecting to Tailscale..."
+  - tailscale up --authkey=${TAILSCALE_AUTH_KEY} --hostname=${HOSTNAME}
+
+  # Wait for Tailscale to be ready
+  - for i in $(seq 1 30); do tailscale status && break || sleep 2; done
+
+  # Mount persistent volume if device specified
+  - |
+    if [ -n "${VOLUME_DEVICE}" ] && [ -b "${VOLUME_DEVICE}" ]; then
+      echo "Mounting workspace volume..."
+      /usr/local/bin/mount-volume.sh "${VOLUME_DEVICE}" /mnt/workspace coder
+    fi
+
+  # Create symlink from home to workspace
+  - |
+    if [ -d "/mnt/workspace" ]; then
+      ln -sf /mnt/workspace /home/coder/workspace
+      chown -h coder:coder /home/coder/workspace
+    fi
+
+  # Set Anthropic API key if provided
+  - |
+    if [ -n "${ANTHROPIC_API_KEY}" ]; then
+      echo "export ANTHROPIC_API_KEY='${ANTHROPIC_API_KEY}'" >> /home/coder/.bashrc
+    fi
+
+  # Start ttyd terminal service
+  - echo "Starting ttyd..."
+  - systemctl start ttyd
+
+  # Signal provisioning complete
+  - touch /var/run/ccc-provisioned
+  - echo "Workspace provisioning complete!"
+
+# Write files
+write_files:
+  # Mount volume script (copy from base image path)
+  - path: /usr/local/bin/mount-volume.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      DEVICE="${1:-/dev/sdb}"
+      MOUNT_POINT="${2:-/mnt/workspace}"
+      OWNER="${3:-coder}"
+
+      echo "Mounting ${DEVICE} to ${MOUNT_POINT}..."
+
+      # Wait for device
+      for i in {1..30}; do
+          [ -b "${DEVICE}" ] && break || sleep 1
+      done
+
+      [ ! -b "${DEVICE}" ] && echo "Device not found" && exit 1
+
+      # Create filesystem if needed
+      blkid "${DEVICE}" | grep -q TYPE || mkfs.ext4 -L ccc-workspace "${DEVICE}"
+
+      # Mount
+      mkdir -p "${MOUNT_POINT}"
+      mount "${DEVICE}" "${MOUNT_POINT}"
+      chown "${OWNER}:${OWNER}" "${MOUNT_POINT}"
+
+      # Add to fstab
+      grep -q "${DEVICE}" /etc/fstab || \
+          echo "${DEVICE} ${MOUNT_POINT} ext4 defaults,nofail 0 2" >> /etc/fstab
+
+      echo "Volume mounted: $(df -h ${MOUNT_POINT} | tail -1)"
+
+# Final message
+final_message: |
+  CCC Workspace ${HOSTNAME} is ready!
+  Tailscale: $(tailscale ip -4 2>/dev/null || echo 'connecting...')
+  ttyd: http://$(tailscale ip -4 2>/dev/null || echo 'pending'):7681
