@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, integer, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // Users table
@@ -10,7 +10,7 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Workspaces table (1:1 with user initially)
+// Workspaces table (1:N with user - users can have multiple workspaces)
 export const workspaces = pgTable("workspaces", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -22,31 +22,39 @@ export const workspaces = pgTable("workspaces", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Workspace volumes
-export const workspaceVolumes = pgTable("workspace_volumes", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  hetznerVolumeId: text("hetzner_volume_id"),
-  sizeGb: integer("size_gb").notNull().default(50),
-  status: text("status").notNull().default("pending"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// Workspace volumes (1:1 with workspace)
+export const workspaceVolumes = pgTable(
+  "workspace_volumes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    hetznerVolumeId: text("hetzner_volume_id"),
+    sizeGb: integer("size_gb").notNull().default(50),
+    status: text("status").notNull().default("pending"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("workspace_volumes_workspace_id_idx").on(table.workspaceId)]
+);
 
-// Workspace instances (VMs)
-export const workspaceInstances = pgTable("workspace_instances", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  hetznerServerId: text("hetzner_server_id"),
-  tailscaleIp: text("tailscale_ip"),
-  status: text("status").notNull().default("pending"), // pending, starting, running, stopping, stopped
-  startedAt: timestamp("started_at"),
-  stoppedAt: timestamp("stopped_at"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// Workspace instances (VMs) - 1:1 with workspace (only one active instance per workspace)
+export const workspaceInstances = pgTable(
+  "workspace_instances",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    hetznerServerId: text("hetzner_server_id"),
+    tailscaleIp: text("tailscale_ip"),
+    status: text("status").notNull().default("pending"), // pending, starting, running, stopping, stopped
+    startedAt: timestamp("started_at"),
+    stoppedAt: timestamp("stopped_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("workspace_instances_workspace_id_idx").on(table.workspaceId)]
+);
 
 // Sessions (tmux sessions)
 export const sessions = pgTable("sessions", {

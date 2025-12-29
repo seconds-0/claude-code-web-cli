@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { requestId } from "hono/request-id";
 import { healthRoute } from "./routes/health.js";
+import { meRoute } from "./routes/me.js";
 
 // Create the main app
 export const app = new Hono();
@@ -13,13 +14,26 @@ app.use("*", requestId());
 app.use(
   "*",
   cors({
-    origin: ["http://localhost:3000", "https://*.vercel.app"],
+    origin: (origin) => {
+      // Allow localhost for development
+      if (origin === "http://localhost:3000") return origin;
+      // Allow specific Vercel preview/production URLs
+      // In production, set ALLOWED_ORIGINS env var
+      const allowedOrigins = process.env["ALLOWED_ORIGINS"]?.split(",") ?? [];
+      if (allowedOrigins.includes(origin)) return origin;
+      // Allow Vercel preview deployments (validate pattern properly)
+      if (origin && /^https:\/\/[\w-]+-[\w-]+\.vercel\.app$/.test(origin)) {
+        return origin;
+      }
+      return null;
+    },
     credentials: true,
   })
 );
 
 // Mount routes
 app.route("/api/v1/health", healthRoute);
+app.route("/api/v1/me", meRoute);
 
 // 404 handler
 app.notFound((c) => {
