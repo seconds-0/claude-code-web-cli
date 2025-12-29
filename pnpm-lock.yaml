@@ -55,6 +55,9 @@ importers:
       "@hono/node-server":
         specifier: ^1.13.7
         version: 1.19.7(hono@4.11.3)
+      drizzle-orm:
+        specifier: ^0.38.3
+        version: 0.38.4(@neondatabase/serverless@0.10.4)(@types/pg@8.11.6)(@types/react@19.2.7)(react@19.2.3)
       hono:
         specifier: ^4.6.14
         version: 4.11.3

@@ -17,6 +17,7 @@
     "@ccc/api-contract": "workspace:*",
     "@ccc/db": "workspace:*",
     "@hono/node-server": "^1.13.7",
+    "drizzle-orm": "^0.38.3",
     "hono": "^4.6.14"
   },
   "devDependencies": {

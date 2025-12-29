@@ -4,6 +4,7 @@ import { logger } from "hono/logger";
 import { requestId } from "hono/request-id";
 import { healthRoute } from "./routes/health.js";
 import { meRoute } from "./routes/me.js";
+import { workspacesRoute } from "./routes/workspaces.js";
 
 // Create the main app
 export const app = new Hono();
@@ -34,6 +35,7 @@ app.use(
 // Mount routes
 app.route("/api/v1/health", healthRoute);
 app.route("/api/v1/me", meRoute);
+app.route("/api/v1/workspaces", workspacesRoute);
 
 // 404 handler
 app.notFound((c) => {
