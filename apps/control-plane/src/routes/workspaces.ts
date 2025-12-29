@@ -306,3 +306,159 @@ workspacesRoute.delete("/:id", async (c) => {
 
   return c.json({ success: true });
 });
+
+// POST /api/v1/workspaces/:id/start - Start a workspace
+workspacesRoute.post("/:id/start", async (c) => {
+  const dbUserId = c.get("dbUserId");
+  const workspaceId = c.req.param("id");
+  const db = getDb();
+
+  const workspace = await db.query.workspaces.findFirst({
+    where: eq(workspaces.id, workspaceId),
+    with: { instance: true },
+  });
+
+  if (!workspace) {
+    return c.json({ error: "not_found", message: "Workspace not found" }, 404);
+  }
+
+  if (workspace.userId !== dbUserId) {
+    return c.json({ error: "forbidden", message: "Not authorized" }, 403);
+  }
+
+  // Check current status
+  if (workspace.status === "provisioning") {
+    return c.json({ error: "conflict", message: "Workspace is already provisioning" }, 409);
+  }
+
+  if (workspace.instance?.status === "running") {
+    return c.json({ error: "conflict", message: "Workspace is already running" }, 409);
+  }
+
+  // Update workspace status to provisioning
+  await db
+    .update(workspaces)
+    .set({ status: "provisioning", updatedAt: new Date() })
+    .where(eq(workspaces.id, workspaceId));
+
+  // Update instance status to starting
+  if (workspace.instance) {
+    await db
+      .update(workspaceInstances)
+      .set({ status: "starting", startedAt: new Date() })
+      .where(eq(workspaceInstances.workspaceId, workspaceId));
+  }
+
+  // TODO: Trigger actual Hetzner VM provisioning via background job
+  // For now, we just update the status. In production, this would:
+  // 1. Create/start Hetzner server
+  // 2. Join Tailscale
+  // 3. Start ttyd
+  // 4. Update status to 'ready' and instance to 'running'
+
+  return c.json({
+    success: true,
+    message: "Workspace start initiated",
+    status: "provisioning",
+  });
+});
+
+// POST /api/v1/workspaces/:id/stop - Stop a workspace (keeps volume, destroys VM)
+workspacesRoute.post("/:id/stop", async (c) => {
+  const dbUserId = c.get("dbUserId");
+  const workspaceId = c.req.param("id");
+  const db = getDb();
+
+  const workspace = await db.query.workspaces.findFirst({
+    where: eq(workspaces.id, workspaceId),
+    with: { instance: true },
+  });
+
+  if (!workspace) {
+    return c.json({ error: "not_found", message: "Workspace not found" }, 404);
+  }
+
+  if (workspace.userId !== dbUserId) {
+    return c.json({ error: "forbidden", message: "Not authorized" }, 403);
+  }
+
+  if (!workspace.instance || workspace.instance.status === "stopped") {
+    return c.json({ error: "conflict", message: "Workspace is already stopped" }, 409);
+  }
+
+  // Update instance status to stopping
+  await db
+    .update(workspaceInstances)
+    .set({ status: "stopping" })
+    .where(eq(workspaceInstances.workspaceId, workspaceId));
+
+  // Update workspace status to suspended
+  await db
+    .update(workspaces)
+    .set({ status: "suspended", updatedAt: new Date() })
+    .where(eq(workspaces.id, workspaceId));
+
+  // TODO: Trigger actual VM shutdown via background job
+  // This would:
+  // 1. Run backup (best effort)
+  // 2. Destroy Hetzner server
+  // 3. Update instance status to 'stopped'
+
+  // For now, immediately mark as stopped
+  await db
+    .update(workspaceInstances)
+    .set({ status: "stopped", stoppedAt: new Date() })
+    .where(eq(workspaceInstances.workspaceId, workspaceId));
+
+  return c.json({
+    success: true,
+    message: "Workspace stopped",
+    status: "suspended",
+  });
+});
+
+// POST /api/v1/workspaces/:id/suspend - Suspend workspace (hibernate - files persist)
+workspacesRoute.post("/:id/suspend", async (c) => {
+  const dbUserId = c.get("dbUserId");
+  const workspaceId = c.req.param("id");
+  const db = getDb();
+
+  const workspace = await db.query.workspaces.findFirst({
+    where: eq(workspaces.id, workspaceId),
+    with: { instance: true },
+  });
+
+  if (!workspace) {
+    return c.json({ error: "not_found", message: "Workspace not found" }, 404);
+  }
+
+  if (workspace.userId !== dbUserId) {
+    return c.json({ error: "forbidden", message: "Not authorized" }, 403);
+  }
+
+  if (workspace.status === "suspended") {
+    return c.json({ error: "conflict", message: "Workspace is already suspended" }, 409);
+  }
+
+  // Update workspace status
+  await db
+    .update(workspaces)
+    .set({ status: "suspended", updatedAt: new Date() })
+    .where(eq(workspaces.id, workspaceId));
+
+  // Stop instance if running
+  if (workspace.instance && workspace.instance.status !== "stopped") {
+    await db
+      .update(workspaceInstances)
+      .set({ status: "stopped", stoppedAt: new Date() })
+      .where(eq(workspaceInstances.workspaceId, workspaceId));
+  }
+
+  // TODO: Trigger backup before suspend
+
+  return c.json({
+    success: true,
+    message: "Workspace suspended",
+    status: "suspended",
+  });
+});
