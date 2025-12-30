@@ -5,6 +5,8 @@ import WorkspaceActions from "./WorkspaceActions";
 import Terminal from "@/components/Terminal";
 import StatusBadge from "@/components/StatusBadge";
 import { PanelStat } from "@/components/Panel";
+import WorkspaceStatusPoller from "@/components/WorkspaceStatusPoller";
+import { getApiUrl } from "@/lib/config";
 
 interface Workspace {
   id: string;
@@ -25,10 +27,8 @@ interface Workspace {
 }
 
 async function getWorkspace(id: string, token: string): Promise<Workspace | null> {
-  const apiUrl = process.env["CONTROL_PLANE_URL"] || "http://localhost:3001";
-
   try {
-    const res = await fetch(`${apiUrl}/api/v1/workspaces/${id}`, {
+    const res = await fetch(`${getApiUrl()}/api/v1/workspaces/${id}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -77,6 +77,12 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
 
   return (
     <div style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
+      {/* Status poller for automatic updates during provisioning */}
+      <WorkspaceStatusPoller
+        workspaceStatus={workspace.status}
+        instanceStatus={workspace.instance?.status}
+      />
+
       {/* Breadcrumb */}
       <div style={{ marginBottom: "1.5rem" }}>
         <Link
