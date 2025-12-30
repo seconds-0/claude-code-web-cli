@@ -47,13 +47,14 @@ echo "Installing Node.js 20.x LTS..."
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt-get install -y nodejs
 
-# Install Python 3.11
+# Install Python 3.11 (alongside system Python 3.10 - don't change defaults to avoid breaking apt)
 echo "Installing Python 3.11..."
 add-apt-repository -y ppa:deadsnakes/ppa
 apt-get update
 apt-get install -y python3.11 python3.11-venv python3.11-dev python3-pip
-update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
-update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+# Make python3.11 available but don't break system Python
+ln -sf /usr/bin/python3.11 /usr/local/bin/python
+ln -sf /usr/bin/python3.11 /usr/local/bin/python3.11
 
 # Install pnpm
 echo "Installing pnpm..."

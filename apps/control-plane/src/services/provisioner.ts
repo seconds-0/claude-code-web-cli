@@ -15,6 +15,8 @@ import {
   type ProvisionJob,
   type DestroyJob,
 } from "../jobs/queue.js";
+import { handleProvisionJob } from "../jobs/handlers/provision.js";
+import { handleDestroyJob } from "../jobs/handlers/destroy.js";
 
 export interface ProvisionResult {
   success: boolean;
@@ -67,8 +69,8 @@ export async function startWorkspace(
 
   // Check if queue is configured
   if (!isQueueConfigured()) {
-    // Fall back to direct status update (for development without Redis)
-    console.warn("[provisioner] Queue not configured, updating status directly");
+    // Fall back to synchronous provisioning (for development without Redis)
+    console.warn("[provisioner] Queue not configured, running synchronous provisioning");
 
     await db
       .update(workspaces)
@@ -82,9 +84,23 @@ export async function startWorkspace(
         .where(eq(workspaceInstances.workspaceId, workspaceId));
     }
 
+    // Run provisioning in-process (fire-and-forget - responds immediately, runs in background)
+    const job: ProvisionJob = {
+      id: `local-${Date.now()}`,
+      type: "provision",
+      workspaceId,
+      userId,
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    };
+
+    // Don't await - let it run in background but respond immediately
+    handleProvisionJob(job).catch((error) => {
+      console.error("[provisioner] Synchronous provisioning failed:", error);
+    });
+
     return {
       success: true,
-      error: "Queue not configured - status updated but no actual provisioning will occur",
     };
   }
 
@@ -143,22 +159,37 @@ export async function stopWorkspace(workspaceId: string, userId: string): Promis
 
   // Check if queue is configured
   if (!isQueueConfigured()) {
-    // Fall back to direct status update (for development without Redis)
-    console.warn("[provisioner] Queue not configured, updating status directly");
+    // Fall back to synchronous destroy (for development without Redis)
+    console.warn("[provisioner] Queue not configured, running synchronous destroy");
 
     await db
       .update(workspaceInstances)
-      .set({ status: "stopped", stoppedAt: new Date() })
+      .set({ status: "stopping" })
       .where(eq(workspaceInstances.workspaceId, workspaceId));
 
     await db
       .update(workspaces)
-      .set({ status: "suspended", updatedAt: new Date() })
+      .set({ status: "stopping", updatedAt: new Date() })
       .where(eq(workspaces.id, workspaceId));
+
+    // Run destroy in-process (fire-and-forget - responds immediately, runs in background)
+    const job: DestroyJob = {
+      id: `local-${Date.now()}`,
+      type: "destroy",
+      workspaceId,
+      userId,
+      hetznerServerId: workspace.instance.hetznerServerId || undefined,
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    };
+
+    // Don't await - let it run in background but respond immediately
+    handleDestroyJob(job).catch((error) => {
+      console.error("[provisioner] Synchronous destroy failed:", error);
+    });
 
     return {
       success: true,
-      error: "Queue not configured - status updated but no actual cleanup occurred",
     };
   }
 

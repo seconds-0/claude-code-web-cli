@@ -45,10 +45,15 @@ source "hcloud" "ubuntu" {
 build {
   sources = ["source.hcloud.ubuntu"]
 
+  # Create scripts directory
+  provisioner "shell" {
+    inline = ["mkdir -p /tmp/scripts"]
+  }
+
   # Copy setup scripts
   provisioner "file" {
     source      = "../scripts/"
-    destination = "/tmp/scripts/"
+    destination = "/tmp/scripts"
   }
 
   # Make scripts executable

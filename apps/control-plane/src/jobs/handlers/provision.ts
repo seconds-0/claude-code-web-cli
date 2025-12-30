@@ -122,13 +122,13 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
       .where(eq(workspaceInstances.workspaceId, workspaceId));
 
     // Step 2: Create Tailscale auth key
+    // Note: Tags require ACL configuration in Tailscale - omitting for now
     console.log(`[provision] Creating Tailscale auth key`);
     const authKey = await tailscale.createAuthKey({
       description: `ccc-workspace-${workspaceId}`,
       expirySeconds: 3600, // 1 hour
       ephemeral: true,
       preauthorized: true,
-      tags: ["tag:ccc-workspace"],
     });
     console.log(`[provision] Created Tailscale auth key: ${authKey.id}`);
 
