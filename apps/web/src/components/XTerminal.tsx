@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import type { Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
+import { getTerminalWsUrl } from "@/lib/config";
 
 interface XTerminalProps {
   workspaceId: string;
@@ -35,24 +36,13 @@ export default function XTerminal({
   const MAX_RECONNECT_ATTEMPTS = 5;
   const RECONNECT_DELAY_MS = 2000;
 
-  // Get WebSocket URL from environment or construct from current origin
-  const getWsUrl = useCallback(() => {
-    const baseUrl = process.env["NEXT_PUBLIC_CONTROL_PLANE_URL"] || "";
-    if (baseUrl) {
-      // Convert HTTP URL to WebSocket URL
-      const wsProtocol = baseUrl.startsWith("https") ? "wss" : "ws";
-      const wsBase = baseUrl.replace(/^https?/, wsProtocol);
-      return `${wsBase}/ws/terminal?token=${encodeURIComponent(sessionToken)}`;
-    }
-    // Fallback to localhost for development
-    return `ws://localhost:8080/ws/terminal?token=${encodeURIComponent(sessionToken)}`;
-  }, [sessionToken]);
+  // Get WebSocket URL from shared config
+  const wsUrl = getTerminalWsUrl(sessionToken);
 
   // Connect to WebSocket
   const connect = useCallback(async () => {
     if (!xtermRef.current) return;
 
-    const wsUrl = getWsUrl();
     // Log without token to avoid sensitive data in logs
     console.log(`[XTerminal] Connecting to WebSocket for workspace ${workspaceId}`);
 
@@ -69,12 +59,25 @@ export default function XTerminal({
         setConnectionState("connected");
         setReconnectAttempt(0);
         onConnect?.();
+
+        // Send initial resize message so ttyd knows terminal dimensions
+        if (xtermRef.current) {
+          const { cols, rows } = xtermRef.current;
+          console.log(`[XTerminal] Sending initial resize: ${cols}x${rows}`);
+          const message = new Uint8Array(5);
+          message[0] = 1; // Resize message type
+          message[1] = (cols >> 8) & 0xff;
+          message[2] = cols & 0xff;
+          message[3] = (rows >> 8) & 0xff;
+          message[4] = rows & 0xff;
+          ws.send(message);
+        }
       };
 
       ws.onmessage = (event) => {
         if (xtermRef.current) {
           if (typeof event.data === "string") {
-            // Handle JSON messages (like ready signal)
+            // Handle JSON messages (like ready signal from our relay)
             try {
               const msg = JSON.parse(event.data);
               if (msg.type === "ready") {
@@ -85,9 +88,20 @@ export default function XTerminal({
               xtermRef.current.write(event.data);
             }
           } else {
-            // Binary data from ttyd
+            // Binary data from ttyd - first byte is message type
             const data = new Uint8Array(event.data);
-            xtermRef.current.write(data);
+            if (data.length > 0) {
+              const msgType = data[0];
+              const payload = data.slice(1);
+              if (msgType === 0) {
+                // Output message - write to terminal
+                xtermRef.current.write(payload);
+              } else if (msgType === 1) {
+                // Window title - ignore for now
+              } else if (msgType === 2) {
+                // Set preferences - ignore for now
+              }
+            }
           }
         }
       };
@@ -129,7 +143,7 @@ export default function XTerminal({
       setConnectionState("error");
       onError?.(error instanceof Error ? error.message : "Connection failed");
     }
-  }, [getWsUrl, onConnect, onDisconnect, onError, reconnectAttempt]);
+  }, [wsUrl, onConnect, onDisconnect, onError, reconnectAttempt]);
 
   // Initialize terminal
   useEffect(() => {
@@ -179,20 +193,30 @@ export default function XTerminal({
       term.open(terminalRef.current);
       fitAddon.fit();
 
-      // Handle terminal input
+      // Handle terminal input - ttyd protocol: byte 0 + data
       term.onData((data) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-          // ttyd expects binary data
           const encoder = new TextEncoder();
-          wsRef.current.send(encoder.encode(data));
+          const textBytes = encoder.encode(data);
+          // ttyd input protocol: first byte is 0 (input), followed by data
+          const message = new Uint8Array(1 + textBytes.length);
+          message[0] = 0; // Input message type
+          message.set(textBytes, 1);
+          wsRef.current.send(message);
         }
       });
 
-      // Handle terminal resize
+      // Handle terminal resize - ttyd protocol: byte 1 + uint16 cols + uint16 rows
       term.onResize(({ cols, rows }) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-          // ttyd resize protocol: JSON message
-          wsRef.current.send(JSON.stringify({ type: "resize", cols, rows }));
+          // ttyd resize protocol: byte 1 + cols (uint16 BE) + rows (uint16 BE)
+          const message = new Uint8Array(5);
+          message[0] = 1; // Resize message type
+          message[1] = (cols >> 8) & 0xff;
+          message[2] = cols & 0xff;
+          message[3] = (rows >> 8) & 0xff;
+          message[4] = rows & 0xff;
+          wsRef.current.send(message);
         }
       });
 

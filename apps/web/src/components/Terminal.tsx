@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useAuth } from "@clerk/nextjs";
 import dynamic from "next/dynamic";
+import { getApiUrl } from "@/lib/config";
 
 // Dynamically import XTerminal to avoid SSR issues with xterm.js
 const XTerminal = dynamic(() => import("./XTerminal"), {
@@ -27,6 +29,7 @@ interface TerminalProps {
 }
 
 export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
+  const { getToken } = useAuth();
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,12 +40,17 @@ export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
       setIsLoading(true);
       setError(null);
 
-      const apiUrl = process.env["NEXT_PUBLIC_CONTROL_PLANE_URL"] || "http://localhost:8080";
-      const response = await fetch(`${apiUrl}/api/v1/workspaces/${workspaceId}/session`, {
+      // Get Clerk auth token
+      const authToken = await getToken();
+      if (!authToken) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(`${getApiUrl()}/api/v1/workspaces/${workspaceId}/session`, {
         method: "POST",
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
         },
       });
 
@@ -59,7 +67,7 @@ export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [workspaceId]);
+  }, [workspaceId, getToken]);
 
   useEffect(() => {
     if (ipAddress) {

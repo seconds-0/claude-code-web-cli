@@ -66,7 +66,7 @@ async function connectToTtyd(
     const ttydUrl = `ws://${tailscaleIp}:${TTYD_PORT}/ws`;
     console.log(`[terminal] Connecting to ttyd at ${ttydUrl}`);
 
-    const ws = new WebSocket(ttydUrl, {
+    const ws = new WebSocket(ttydUrl, ["tty"], {
       handshakeTimeout: 10000,
     });
 
