@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import Panel, { PanelContent } from "@/components/Panel";
+import { getApiUrl } from "@/lib/config";
 
 export default function NewWorkspacePage() {
   const router = useRouter();
@@ -20,9 +21,8 @@ export default function NewWorkspacePage() {
 
     try {
       const token = await getToken();
-      const apiUrl = process.env["NEXT_PUBLIC_CONTROL_PLANE_URL"] || "http://localhost:3001";
 
-      const res = await fetch(`${apiUrl}/api/v1/workspaces`, {
+      const res = await fetch(`${getApiUrl()}/api/v1/workspaces`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import StatusBadge from "@/components/StatusBadge";
 import Panel, { PanelContent } from "@/components/Panel";
+import { getApiUrl } from "@/lib/config";
 
 interface Workspace {
   id: string;
@@ -14,10 +15,8 @@ interface Workspace {
 }
 
 async function getWorkspaces(token: string): Promise<Workspace[]> {
-  const apiUrl = process.env["CONTROL_PLANE_URL"] || "http://localhost:3001";
-
   try {
-    const res = await fetch(`${apiUrl}/api/v1/workspaces`, {
+    const res = await fetch(`${getApiUrl()}/api/v1/workspaces`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -125,14 +124,12 @@ export default async function DashboardPage() {
               style={{ display: "block" }}
             >
               <div
+                className="workspace-card"
                 style={{
-                  background: "var(--surface)",
                   padding: "1.25rem",
                   cursor: "pointer",
                   transition: "background var(--transition)",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-hover)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "var(--surface)")}
               >
                 <div
                   style={{

@@ -523,3 +523,12 @@ button.latched,
   background: var(--selection);
   color: white;
 }
+
+/* ========== WORKSPACE CARD ========== */
+.workspace-card {
+  background: var(--surface);
+}
+
+.workspace-card:hover {
+  background: var(--surface-hover);
+}

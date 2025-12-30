@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { getApiUrl } from "@/lib/config";
 
 interface WorkspaceActionsProps {
   workspaceId: string;
@@ -26,9 +27,8 @@ export default function WorkspaceActions({
 
     try {
       const token = await getToken();
-      const apiUrl = process.env["NEXT_PUBLIC_CONTROL_PLANE_URL"] || "http://localhost:3001";
 
-      const res = await fetch(`${apiUrl}/api/v1/workspaces/${workspaceId}/${action}`, {
+      const res = await fetch(`${getApiUrl()}/api/v1/workspaces/${workspaceId}/${action}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
