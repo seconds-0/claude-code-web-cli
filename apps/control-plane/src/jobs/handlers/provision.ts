@@ -32,15 +32,27 @@ function generateCloudInit(params: {
   tailscaleAuthKey: string;
   hostname: string;
   volumeDevice?: string;
+  sshPublicKey?: string;
 }): string {
-  const { tailscaleAuthKey, hostname, volumeDevice } = params;
+  const { tailscaleAuthKey, hostname, volumeDevice, sshPublicKey } = params;
 
   return `#cloud-config
 hostname: ${hostname}
 
 package_update: false
 package_upgrade: false
-
+${
+  sshPublicKey
+    ? `
+users:
+  - name: coder
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${sshPublicKey}
+`
+    : ""
+}
 runcmd:
   # Connect to Tailscale
   - tailscale up --authkey=${tailscaleAuthKey} --hostname=${hostname}
@@ -177,6 +189,7 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
       tailscaleAuthKey: authKey.key,
       hostname,
       volumeDevice,
+      sshPublicKey: process.env["SSH_PUBLIC_KEY"],
     });
 
     const serverResult = await hetzner.createServer({

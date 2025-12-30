@@ -6,7 +6,7 @@
  */
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 60_000; // 60 seconds for standard API calls
 const PROVISIONING_TIMEOUT_MS = 300_000; // 5 minutes for server creation
 
 // Server types for pricing reference
