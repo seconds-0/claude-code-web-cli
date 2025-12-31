@@ -28,14 +28,21 @@ interface TerminalProps {
   ipAddress: string;
 }
 
+// Connection info - either direct connect URL or relay session token
+interface ConnectionInfo {
+  mode: "direct" | "relay";
+  url: string;
+  expiresAt?: string;
+}
+
 export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
   const { getToken } = useAuth();
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch session token from API
-  const fetchSessionToken = useCallback(async () => {
+  // Fetch connection info - try direct connect first, fall back to relay
+  const fetchConnectionInfo = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -46,6 +53,36 @@ export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
         throw new Error("Not authenticated");
       }
 
+      // Step 1: Try direct connect first (low latency)
+      try {
+        const directResponse = await fetch(
+          `${getApiUrl()}/api/v1/workspaces/${workspaceId}/direct-connect`,
+          {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          }
+        );
+
+        if (directResponse.ok) {
+          const directData = await directResponse.json();
+          if (directData.available && directData.directUrl) {
+            console.log("[Terminal] Using direct connect for low latency");
+            setConnectionInfo({
+              mode: "direct",
+              url: directData.directUrl,
+              expiresAt: directData.expiresAt,
+            });
+            return;
+          }
+          // Not available (e.g., private mode) - fall through to relay
+          console.log("[Terminal] Direct connect not available:", directData.reason || "unknown");
+        }
+      } catch (directErr) {
+        console.warn("[Terminal] Direct connect check failed, falling back to relay:", directErr);
+      }
+
+      // Step 2: Fall back to relay connection
       const response = await fetch(`${getApiUrl()}/api/v1/workspaces/${workspaceId}/session`, {
         method: "POST",
         headers: {
@@ -60,9 +97,14 @@ export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
       }
 
       const data = await response.json();
-      setSessionToken(data.token);
+      console.log("[Terminal] Using relay connection");
+      setConnectionInfo({
+        mode: "relay",
+        url: data.wsUrl,
+        expiresAt: data.expiresAt,
+      });
     } catch (err) {
-      console.error("Failed to fetch session token:", err);
+      console.error("Failed to fetch connection info:", err);
       setError(err instanceof Error ? err.message : "Failed to connect to terminal");
     } finally {
       setIsLoading(false);
@@ -71,9 +113,9 @@ export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
 
   useEffect(() => {
     if (ipAddress) {
-      fetchSessionToken();
+      fetchConnectionInfo();
     }
-  }, [ipAddress, fetchSessionToken]);
+  }, [ipAddress, fetchConnectionInfo]);
 
   if (!ipAddress) {
     return (
@@ -143,7 +185,7 @@ export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
         </div>
         <p style={{ marginBottom: "1rem" }}>{error}</p>
         <button
-          onClick={fetchSessionToken}
+          onClick={fetchConnectionInfo}
           style={{
             padding: "0.5rem 1rem",
             fontFamily: "var(--font-mono)",
@@ -160,7 +202,7 @@ export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
     );
   }
 
-  if (!sessionToken) {
+  if (!connectionInfo) {
     return (
       <div
         style={{
@@ -171,7 +213,7 @@ export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
           color: "var(--muted)",
         }}
       >
-        No session token available
+        No connection info available
       </div>
     );
   }
@@ -179,8 +221,9 @@ export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
   return (
     <XTerminal
       workspaceId={workspaceId}
-      sessionToken={sessionToken}
-      onConnect={() => console.log("Terminal connected")}
+      wsUrl={connectionInfo.url}
+      connectionMode={connectionInfo.mode}
+      onConnect={() => console.log(`Terminal connected via ${connectionInfo.mode}`)}
       onDisconnect={() => console.log("Terminal disconnected")}
       onError={(err) => setError(err)}
     />

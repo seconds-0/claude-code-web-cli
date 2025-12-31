@@ -5,11 +5,12 @@ import type { Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
 import type { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
-import { getTerminalWsUrl } from "@/lib/config";
+import { getWsUrl } from "@/lib/config";
 
 interface XTerminalProps {
   workspaceId: string;
-  sessionToken: string;
+  wsUrl: string; // Full WebSocket URL (either direct or relay)
+  connectionMode: "direct" | "relay"; // Which mode we're using
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: string) => void;
@@ -40,7 +41,8 @@ const initializedContainers = new WeakSet<HTMLElement>();
 
 export default function XTerminal({
   workspaceId,
-  sessionToken,
+  wsUrl,
+  connectionMode,
   onConnect,
   onDisconnect,
   onError,
@@ -68,20 +70,25 @@ export default function XTerminal({
   const MAX_RECONNECT_ATTEMPTS = 5;
   const RECONNECT_DELAY_MS = 2000;
 
-  // Get WebSocket URL from shared config
-  const wsUrl = getTerminalWsUrl(sessionToken);
+  // Build the full WebSocket URL
+  // For relay mode, wsUrl is relative (e.g., /ws/terminal?token=...) so we need to prepend the base
+  // For direct mode, wsUrl is already absolute (e.g., wss://1-2-3-4.nip.io/ws?token=...)
+  const fullWsUrl =
+    wsUrl.startsWith("wss://") || wsUrl.startsWith("ws://") ? wsUrl : `${getWsUrl()}${wsUrl}`;
 
   // Connect to WebSocket
   const connect = useCallback(async () => {
     if (!xtermRef.current) return;
 
     // Log without token to avoid sensitive data in logs
-    console.log(`[XTerminal] Connecting to WebSocket for workspace ${workspaceId}`);
+    console.log(
+      `[XTerminal] Connecting to WebSocket for workspace ${workspaceId} (${connectionMode} mode)`
+    );
 
     setConnectionState("connecting");
 
     try {
-      const ws = new WebSocket(wsUrl);
+      const ws = new WebSocket(fullWsUrl);
       wsRef.current = ws;
 
       ws.binaryType = "arraybuffer";
@@ -239,7 +246,7 @@ export default function XTerminal({
       setConnectionState("error");
       onError?.(error instanceof Error ? error.message : "Connection failed");
     }
-  }, [wsUrl, onConnect, onDisconnect, onError]);
+  }, [fullWsUrl, connectionMode, workspaceId, onConnect, onDisconnect, onError]);
 
   // Initialize terminal
   useEffect(() => {
@@ -492,6 +499,40 @@ export default function XTerminal({
     }
   };
 
+  // Get connection mode badge
+  const getModeBadge = () => {
+    if (connectionState !== "connected") return null;
+    return connectionMode === "direct" ? (
+      <span
+        style={{
+          background: "var(--success)",
+          color: "#000",
+          padding: "0.125rem 0.375rem",
+          fontSize: "0.5rem",
+          fontWeight: 600,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+        }}
+      >
+        DIRECT
+      </span>
+    ) : (
+      <span
+        style={{
+          background: "var(--muted)",
+          color: "#000",
+          padding: "0.125rem 0.375rem",
+          fontSize: "0.5rem",
+          fontWeight: 600,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+        }}
+      >
+        RELAY
+      </span>
+    );
+  };
+
   return (
     <div
       style={{
@@ -518,6 +559,8 @@ export default function XTerminal({
       >
         <span>WS.{workspaceId.slice(0, 8).toUpperCase()}</span>
         <span style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
+          {/* Connection mode badge */}
+          {getModeBadge()}
           {/* Flow control buffering indicator */}
           {isBuffering && (
             <span
