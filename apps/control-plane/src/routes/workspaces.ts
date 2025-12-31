@@ -24,10 +24,14 @@ workspacesRoute.use("*", async (c, next) => {
   const clerkId = c.get("userId");
   const db = getDb();
 
+  console.log("[workspaces] Looking up user for clerkId:", clerkId);
+
   // Find or create user
   let user = await db.query.users.findFirst({
     where: eq(users.clerkId, clerkId),
   });
+
+  console.log("[workspaces] Found user:", user?.id, "for clerkId:", clerkId);
 
   if (!user) {
     // Auto-create user on first access

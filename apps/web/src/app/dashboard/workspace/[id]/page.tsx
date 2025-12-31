@@ -49,7 +49,7 @@ async function getWorkspace(id: string, token: string): Promise<Workspace | null
     // Map tailscaleIp to ipAddress for UI compatibility
     return {
       ...data.workspace,
-      volume: data.volume,
+      volume: data.volume || undefined,
       instance: data.instance
         ? {
             ...data.instance,
