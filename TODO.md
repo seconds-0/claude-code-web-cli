@@ -8,15 +8,7 @@ Long-term planning hub. Update when starting/completing work or discovering new 
 
 ## In Progress
 
-### Terminal Latency Fix: Frontend Integration
-
-**Goal:** Connect XTerminal to direct connect endpoint
-
-**Remaining Work:**
-
-- [ ] Frontend: Update XTerminal to try direct connect first, fall back to relay
-- [ ] Add "connected via direct" indicator in terminal header
-- [ ] Test end-to-end latency improvement
+_Nothing currently in progress_
 
 ---
 
@@ -139,6 +131,13 @@ Long-term planning hub. Update when starting/completing work or discovering new 
 - [x] Warning text about latency tradeoff
 - [x] Direct-connect endpoint respects privateMode setting
 - [x] Database migration for privateMode column
+
+**Frontend Integration:**
+
+- [x] Terminal.tsx: Try direct connect first, fall back to relay (commit: 826a797)
+- [x] XTerminal.tsx: Accept wsUrl and connectionMode props
+- [x] Connection mode badge (green DIRECT / gray RELAY) in terminal header
+- [x] Walkthrough documentation updated (commit: 63e5af6)
 
 **Other:**
 
