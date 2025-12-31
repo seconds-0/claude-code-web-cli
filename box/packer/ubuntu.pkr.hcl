@@ -95,6 +95,14 @@ build {
     ]
   }
 
+  # Install Caddy for direct connect mode (optional low-latency)
+  provisioner "shell" {
+    script = "../scripts/install-caddy.sh"
+    environment_vars = [
+      "DEBIAN_FRONTEND=noninteractive"
+    ]
+  }
+
   # Clean up
   provisioner "shell" {
     inline = [
