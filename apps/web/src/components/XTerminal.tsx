@@ -164,6 +164,11 @@ export default function XTerminal({
         console.log(`[XTerminal] WebSocket closed: ${event.code} ${event.reason}`);
         wsRef.current = null;
 
+        // Reset flow control state on disconnect
+        setIsBuffering(false);
+        pendingDataRef.current = 0;
+        isPausedRef.current = false;
+
         if (event.code !== 1000) {
           // Abnormal close, attempt reconnect
           setConnectionState("disconnected");
@@ -304,8 +309,10 @@ export default function XTerminal({
       // Prevent browser from capturing Ctrl+W/T/N/L (critical for vim/tmux)
       term.attachCustomKeyEventHandler((event) => {
         if (event.ctrlKey && ["w", "t", "n", "l"].includes(event.key.toLowerCase())) {
-          // Return false to let the terminal handle these keys
-          return false;
+          // Prevent browser from handling (e.g., Ctrl+W closing tab)
+          event.preventDefault();
+          // Return true to let xterm process the key
+          return true;
         }
         return true;
       });

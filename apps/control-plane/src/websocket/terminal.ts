@@ -250,19 +250,33 @@ async function handleConnection(clientWs: WebSocket, request: IncomingMessage): 
             if (!conn) return;
 
             if (msg.ready) {
-              // Client ready to receive - flush buffer and resume
+              // Client ready to receive - flush buffer with chunking to avoid flooding
               console.log(
                 `[terminal] Connection ${connectionId} flow resumed, flushing ${conn.buffer.length} buffered messages`
               );
               conn.flowPaused = false;
-              // Flush buffered data
-              for (const bufferedData of conn.buffer) {
-                if (clientWs.readyState === WebSocket.OPEN) {
-                  clientWs.send(bufferedData);
-                }
-              }
+
+              // Flush in chunks to avoid overwhelming client
+              const bufferedData = conn.buffer;
               conn.buffer = [];
               conn.bufferSize = 0;
+
+              const CHUNK_SIZE = 10; // Messages per tick
+              let index = 0;
+
+              const flushChunk = () => {
+                const end = Math.min(index + CHUNK_SIZE, bufferedData.length);
+                while (index < end) {
+                  if (clientWs.readyState !== WebSocket.OPEN) return;
+                  const chunk = bufferedData[index];
+                  if (chunk) clientWs.send(chunk);
+                  index++;
+                }
+                if (index < bufferedData.length) {
+                  setImmediate(flushChunk); // Yield to event loop
+                }
+              };
+              flushChunk();
             } else {
               // Client requested pause
               console.log(`[terminal] Connection ${connectionId} flow paused by client`);
