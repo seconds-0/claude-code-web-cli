@@ -14,50 +14,6 @@ _Nothing currently in progress_
 
 ## Up Next
 
-### P0: Onboarding UX (THE FLOOR)
-
-**Goal:** < 2 minutes from landing page to terminal (current: 9 steps, ~5+ min)
-
-**Audit completed:** 2024-12-31 (Codex, Gemini, best practices research)
-
-#### Current Flow Problems (9 steps → target 3)
-
-| Step                  | Problem                          | Fix                       |
-| --------------------- | -------------------------------- | ------------------------- |
-| Empty dashboard       | Dead stop, user must find button | Auto-redirect to setup    |
-| Name form             | Non-decision, slows first run    | Default to "My Workspace" |
-| Click "Start"         | Manual gate after creation       | Auto-start on create      |
-| Wait with no feedback | Silent polling, boring           | Boot sequence animation   |
-
-#### Implementation Tasks
-
-**Backend (control-plane)**
-
-- [ ] Add `autoStart?: boolean` to create workspace API (`packages/api-contract/src/schemas/workspace.ts:50`)
-- [ ] Call `startWorkspace()` in POST handler when `autoStart=true` (`apps/control-plane/src/routes/workspaces.ts:80`)
-- [ ] (Optional) Add idempotent `/quickstart` endpoint for first-time users
-
-**Frontend (web)**
-
-- [ ] Create `/dashboard/setup` auto-init page that creates+starts workspace automatically
-- [ ] Auto-redirect from `/dashboard` when 0 workspaces → `/dashboard/setup`
-- [ ] Configure Clerk `afterSignUpUrl="/dashboard/setup"` (`apps/web/src/app/sign-up/[[...sign-up]]/page.tsx:13`)
-- [ ] Remove name input from first-run flow (default "My Workspace")
-- [ ] Add boot sequence animation during provisioning (replace "AWAITING_CONNECTION")
-- [x] Fix storage mismatch: UI shows 20GB → 50GB (DONE 2024-12-31)
-
-**UX Polish**
-
-- [ ] Change landing CTA from "Initialize Workspace" to "Start Coding" (expectation match)
-- [ ] Auto-redirect to workspace when user has exactly 1 workspace
-- [ ] Add progress indicators: "Allocating volume... Starting instance... Connecting..."
-
-**Metrics to Track**
-
-- Time to first terminal (target: < 2 min)
-- Onboarding completion rate (target: > 75%)
-- Drop-off at each step
-
 ### P1: Mobile Experience + QR Auth
 
 **Goal:** Pair phone in < 30 seconds
@@ -112,6 +68,28 @@ _Nothing currently in progress_
 ## Done
 
 <!-- Completed items with dates -->
+
+### P0: Onboarding UX (2024-12-31)
+
+**Goal achieved:** Reduced onboarding from 9 steps to 3 steps (commit: 06cfd91)
+
+**Backend:**
+
+- [x] Add `autoStart?: boolean` to create workspace API
+- [x] Call `startWorkspace()` automatically when `autoStart=true`
+- [x] Default workspace name changed to "My Workspace"
+
+**Frontend:**
+
+- [x] Create `/dashboard/setup` auto-init page with boot sequence animation
+- [x] Auto-redirect from `/dashboard` when 0 workspaces
+- [x] Configure Clerk `afterSignUpUrl="/dashboard/setup"`
+- [x] Fix storage display (20GB → 50GB)
+- [x] Change landing CTA to "Start Coding"
+
+**New user flow:** Sign up → Auto-setup with progress animation → Terminal ready
+
+---
 
 ### Terminal Latency Fix (2024-12-31)
 
