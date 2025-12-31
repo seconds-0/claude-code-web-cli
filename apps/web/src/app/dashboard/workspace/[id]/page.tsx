@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import WorkspaceActions from "./WorkspaceActions";
-import Terminal from "@/components/Terminal";
+import TerminalSection from "@/components/TerminalSection";
 import StatusBadge from "@/components/StatusBadge";
 import { PanelStat } from "@/components/Panel";
 import WorkspaceStatusPoller from "@/components/WorkspaceStatusPoller";
@@ -161,55 +161,12 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
       </div>
 
       {/* Terminal Section */}
-      <div className="terminal-container" style={{ marginBottom: "2rem" }}>
-        <div className="terminal-header">
-          <span>TERMINAL.01 / {workspace.name.toUpperCase().replace(/\s+/g, "_")}</span>
-          {isTerminalReady && workspace.instance?.ipAddress ? (
-            <span style={{ color: "var(--success)" }}>● CONNECTED</span>
-          ) : (
-            <span style={{ color: "var(--muted)" }}>○ OFFLINE</span>
-          )}
-        </div>
-        <div className="terminal-screen" style={{ height: "400px" }}>
-          {isTerminalReady && workspace.instance?.ipAddress ? (
-            <Terminal workspaceId={workspace.id} ipAddress={workspace.instance.ipAddress} />
-          ) : (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "100%",
-                textAlign: "center",
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "0.75rem",
-                  color: "var(--muted)",
-                  marginBottom: "1rem",
-                }}
-              >
-                AWAITING_CONNECTION
-              </div>
-              <p style={{ color: "var(--muted)", marginBottom: "0.5rem" }}>
-                Workspace is not running
-              </p>
-              <p
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "0.75rem",
-                  color: "var(--muted)",
-                }}
-              >
-                Start the workspace to access terminal
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      <TerminalSection
+        workspaceId={workspace.id}
+        workspaceName={workspace.name}
+        ipAddress={workspace.instance?.ipAddress}
+        isReady={isTerminalReady}
+      />
 
       {/* Info Grid */}
       <div
