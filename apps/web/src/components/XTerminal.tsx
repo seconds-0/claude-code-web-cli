@@ -236,6 +236,11 @@ export default function XTerminal({
         scrollback: 2000, // ~12MB memory, practical history
         logLevel: "warn", // Reduce console overhead
         drawBoldTextInBrightColors: false, // Reduce repaint cost
+        scrollSensitivity: 1, // Normal scroll speed
+        fastScrollSensitivity: 5, // Fast scroll multiplier
+        smoothScrollDuration: 0, // Disable smooth scroll for snappier feel
+        macOptionIsMeta: true, // macOS Option key as Meta for proper terminal shortcuts
+        macOptionClickForcesSelection: true, // Option+click for selection on mac
         theme: {
           background: "#0d0d0d",
           foreground: "#e5e5e5",
