@@ -104,10 +104,10 @@ export default async function Home() {
         {/* CTA Buttons */}
         <div style={{ display: "flex", gap: "0.75rem", marginBottom: "3rem" }}>
           <Link href="/sign-up">
-            <button className="primary">Initialize Workspace →</button>
+            <button className="primary">Start Coding →</button>
           </Link>
           <Link href="/sign-in">
-            <button className="ghost">Access Terminal</button>
+            <button className="ghost">Sign In</button>
           </Link>
         </div>
 

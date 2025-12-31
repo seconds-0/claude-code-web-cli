@@ -53,6 +53,8 @@ export const createWorkspaceRequestSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   // Private mode: Tailscale-only networking (default: false for low-latency)
   privateMode: z.boolean().optional().default(false),
+  /** If true, immediately start provisioning after creation */
+  autoStart: z.boolean().optional(),
 });
 
 // Update request schema for changing workspace settings

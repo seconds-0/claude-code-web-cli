@@ -90,8 +90,9 @@ workspacesRoute.post("/", async (c) => {
     // Empty body is fine, all fields are optional
   }
 
-  const name = body.name || "default";
+  const name = body.name || "My Workspace";
   const privateMode = body.privateMode ?? false; // Default to false for low-latency direct connect
+  const autoStart = body.autoStart ?? false;
 
   // Create workspace
   const workspaceResult = await db
@@ -138,12 +139,28 @@ workspacesRoute.post("/", async (c) => {
     return c.json({ error: "create_failed", message: "Failed to create instance" }, 500);
   }
 
+  // If autoStart is true, immediately trigger provisioning
+  let workspaceStatus = workspace.status;
+  let instanceStatus = instance.status;
+  let jobId: string | undefined;
+
+  if (autoStart) {
+    const { startWorkspace } = await import("../services/provisioner.js");
+    const startResult = await startWorkspace(workspace.id, dbUserId);
+    if (startResult.success) {
+      workspaceStatus = "provisioning";
+      instanceStatus = "starting";
+      jobId = startResult.job?.id;
+    }
+    // If start fails, we still return the created workspace (user can retry)
+  }
+
   const response: WorkspaceResponse = {
     workspace: {
       id: workspace.id,
       userId: workspace.userId,
       name: workspace.name,
-      status: workspace.status as "pending" | "provisioning" | "ready" | "suspended" | "error",
+      status: workspaceStatus as "pending" | "provisioning" | "ready" | "suspended" | "error",
       privateMode: workspace.privateMode,
       createdAt: workspace.createdAt.toISOString(),
       updatedAt: workspace.updatedAt.toISOString(),
@@ -161,14 +178,15 @@ workspacesRoute.post("/", async (c) => {
       workspaceId: instance.workspaceId,
       hetznerServerId: instance.hetznerServerId,
       tailscaleIp: instance.tailscaleIp,
-      status: instance.status as "pending" | "starting" | "running" | "stopping" | "stopped",
+      status: instanceStatus as "pending" | "starting" | "running" | "stopping" | "stopped",
       startedAt: instance.startedAt?.toISOString() ?? null,
       stoppedAt: instance.stoppedAt?.toISOString() ?? null,
       createdAt: instance.createdAt.toISOString(),
     },
   };
 
-  return c.json(response, 201);
+  // Include jobId in response if autoStart was triggered
+  return c.json({ ...response, jobId }, 201);
 });
 
 // GET /api/v1/workspaces/:id - Get a specific workspace
