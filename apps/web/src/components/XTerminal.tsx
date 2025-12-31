@@ -230,8 +230,9 @@ export default function XTerminal({
       term = new Terminal({
         cursorBlink: false, // Saves periodic renders
         cursorStyle: "block",
-        fontSize: 14,
-        fontFamily: "var(--font-mono), 'JetBrains Mono', monospace",
+        fontSize: 16,
+        lineHeight: 1.2,
+        fontFamily: "'JetBrains Mono', 'SF Mono', 'Menlo', monospace",
         scrollback: 2000, // ~12MB memory, practical history
         logLevel: "warn", // Reduce console overhead
         drawBoldTextInBrightColors: false, // Reduce repaint cost
@@ -367,8 +368,13 @@ export default function XTerminal({
       }
 
       // Dispose WebGL addon to free up context (browsers limit to ~16)
+      // Use try-catch because addon may already be disposed by terminal or context loss
       if (webglAddonRef.current) {
-        webglAddonRef.current.dispose();
+        try {
+          webglAddonRef.current.dispose();
+        } catch {
+          // Already disposed, ignore
+        }
         webglAddonRef.current = null;
       }
 
