@@ -146,3 +146,13 @@ pnpm format           # Prettier format
 - [Stripe Billing Meters](https://docs.stripe.com/billing/subscriptions/usage-based)
 - [Clerk JWT verification](https://clerk.com/docs/guides/sessions/manual-jwt-verification)
 - [Hetzner Volumes](https://docs.hetzner.com/cloud/volumes/overview/) - no built-in backups
+
+## Long-Term Planning
+
+See `/TODO.md` for the product roadmap and backlog. Update this file when:
+
+- Starting new work (move to "In Progress")
+- Completing work (move to "Done" with date)
+- Discovering new requirements (add to "Backlog")
+
+**Competitive baseline:** [Happy Coder](https://github.com/slopus/happy) - our floor for UX simplicity.
