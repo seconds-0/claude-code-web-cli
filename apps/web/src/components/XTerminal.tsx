@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
+import type { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { getTerminalWsUrl } from "@/lib/config";
 
@@ -17,6 +18,19 @@ interface XTerminalProps {
 // Connection states
 type ConnectionState = "connecting" | "connected" | "disconnected" | "error";
 
+// Flow control constants - prevents browser crash from rapid output
+const HIGH_WATERMARK = 500_000; // 500KB - pause when exceeded
+const LOW_WATERMARK = 50_000; // 50KB - resume when below
+
+// Debounce utility
+function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return ((...args: unknown[]) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), ms);
+  }) as T;
+}
+
 // Module-level tracking to prevent StrictMode double-init race conditions
 const initializedContainers = new WeakSet<HTMLElement>();
 
@@ -30,11 +44,17 @@ export default function XTerminal({
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const webglAddonRef = useRef<WebglAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Flow control state (refs to avoid re-renders on every byte)
+  const pendingDataRef = useRef(0);
+  const isPausedRef = useRef(false);
+
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [isBuffering, setIsBuffering] = useState(false); // UX indicator for flow control
 
   const MAX_RECONNECT_ATTEMPTS = 5;
   const RECONNECT_DELAY_MS = 2000;
@@ -71,36 +91,74 @@ export default function XTerminal({
       };
 
       ws.onmessage = (event) => {
-        if (xtermRef.current) {
-          if (typeof event.data === "string") {
-            // Handle JSON messages (like ready signal from our relay)
-            try {
-              const msg = JSON.parse(event.data);
-              if (msg.type === "ready") {
-                console.log("[XTerminal] Terminal ready:", msg.workspaceId);
-              }
-            } catch {
-              // Not JSON, treat as terminal data
-              xtermRef.current.write(event.data);
+        if (!xtermRef.current) return;
+
+        // Handle JSON messages (like ready signal or flow control)
+        if (typeof event.data === "string") {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === "ready") {
+              console.log("[XTerminal] Terminal ready:", msg.workspaceId);
             }
-          } else {
-            // Binary data from ttyd - first byte is message type (ASCII character)
-            // ttyd uses ASCII: '0' (48) = output, '1' (49) = title, '2' (50) = prefs
-            const data = new Uint8Array(event.data);
-            if (data.length > 0) {
-              const msgType = data[0];
-              const payload = data.slice(1);
-              if (msgType === 48) {
-                // '0' = Output message - write to terminal as string
-                const decoder = new TextDecoder();
-                const text = decoder.decode(payload);
-                xtermRef.current.write(text);
-              }
-              // '1' (49) = title, '2' (50) = prefs - ignored for now
-            }
+            return;
+          } catch {
+            // Not JSON, treat as terminal data (shouldn't happen often)
+            writeWithFlowControl(event.data, event.data.length);
+            return;
           }
         }
+
+        // Binary data from ttyd - first byte is message type (ASCII character)
+        // ttyd uses ASCII: '0' (48) = output, '1' (49) = title, '2' (50) = prefs
+        const data = new Uint8Array(event.data);
+        if (data.length === 0) return;
+
+        const msgType = data[0];
+        const payload = data.slice(1);
+
+        if (msgType === 48) {
+          // '0' = Output message - write to terminal with flow control
+          const decoder = new TextDecoder();
+          const text = decoder.decode(payload);
+          writeWithFlowControl(text, payload.length);
+        }
+        // '1' (49) = title, '2' (50) = prefs - ignored for now
       };
+
+      // Flow control: write data with watermark-based backpressure
+      function writeWithFlowControl(text: string, byteLength: number) {
+        if (!xtermRef.current) return;
+
+        pendingDataRef.current += byteLength;
+
+        // Show buffering indicator when approaching high watermark
+        if (pendingDataRef.current > HIGH_WATERMARK * 0.8 && !isBuffering) {
+          setIsBuffering(true);
+        }
+
+        // Write with callback to track when data is processed
+        xtermRef.current.write(text, () => {
+          pendingDataRef.current -= byteLength;
+
+          // Resume if we've dropped below low watermark
+          if (isPausedRef.current && pendingDataRef.current < LOW_WATERMARK) {
+            isPausedRef.current = false;
+            setIsBuffering(false);
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: "flow", ready: true }));
+            }
+          }
+        });
+
+        // Pause if we've exceeded high watermark
+        if (!isPausedRef.current && pendingDataRef.current > HIGH_WATERMARK) {
+          isPausedRef.current = true;
+          setIsBuffering(true);
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "flow", ready: false }));
+          }
+        }
+      }
 
       ws.onclose = (event) => {
         console.log(`[XTerminal] WebSocket closed: ${event.code} ${event.reason}`);
@@ -165,10 +223,13 @@ export default function XTerminal({
       const { ClipboardAddon } = await import("@xterm/addon-clipboard");
 
       term = new Terminal({
-        cursorBlink: true,
+        cursorBlink: false, // Saves periodic renders
         cursorStyle: "block",
         fontSize: 14,
         fontFamily: "var(--font-mono), 'JetBrains Mono', monospace",
+        scrollback: 2000, // ~12MB memory, practical history
+        logLevel: "warn", // Reduce console overhead
+        drawBoldTextInBrightColors: false, // Reduce repaint cost
         theme: {
           background: "#0d0d0d",
           foreground: "#e5e5e5",
@@ -203,6 +264,52 @@ export default function XTerminal({
 
       term.open(terminalRef.current);
 
+      // WebGL renderer with Canvas fallback (3-5x faster than DOM)
+      try {
+        const { WebglAddon } = await import("@xterm/addon-webgl");
+        const webgl = new WebglAddon();
+        webgl.onContextLoss(() => {
+          console.warn("[XTerminal] WebGL context lost, falling back to Canvas");
+          webgl.dispose();
+          webglAddonRef.current = null;
+          // Fallback to Canvas on context loss
+          import("@xterm/addon-canvas").then(({ CanvasAddon }) => {
+            if (term) {
+              term.loadAddon(new CanvasAddon());
+            }
+          });
+        });
+        term.loadAddon(webgl);
+        webglAddonRef.current = webgl;
+        console.log("[XTerminal] Using WebGL renderer");
+      } catch (e) {
+        console.warn("[XTerminal] WebGL not available, trying Canvas:", e);
+        try {
+          const { CanvasAddon } = await import("@xterm/addon-canvas");
+          term.loadAddon(new CanvasAddon());
+          console.log("[XTerminal] Using Canvas renderer");
+        } catch (canvasError) {
+          console.warn("[XTerminal] Canvas not available, using DOM renderer:", canvasError);
+        }
+      }
+
+      // Web links addon for clickable URLs
+      try {
+        const { WebLinksAddon } = await import("@xterm/addon-web-links");
+        term.loadAddon(new WebLinksAddon());
+      } catch (e) {
+        console.warn("[XTerminal] Web links addon not available:", e);
+      }
+
+      // Prevent browser from capturing Ctrl+W/T/N/L (critical for vim/tmux)
+      term.attachCustomKeyEventHandler((event) => {
+        if (event.ctrlKey && ["w", "t", "n", "l"].includes(event.key.toLowerCase())) {
+          // Return false to let the terminal handle these keys
+          return false;
+        }
+        return true;
+      });
+
       fitAddon.fit();
 
       // Handle terminal input - ttyd expects '0' + data as text string
@@ -229,17 +336,17 @@ export default function XTerminal({
 
     initTerminal();
 
-    // Handle window resize
-    const handleResize = () => {
+    // Handle window resize with debouncing to avoid excessive fit() calls
+    const debouncedFit = debounce(() => {
       if (fitAddonRef.current) {
         fitAddonRef.current.fit();
       }
-    };
+    }, 100);
 
-    window.addEventListener("resize", handleResize);
+    window.addEventListener("resize", debouncedFit);
 
     return () => {
-      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("resize", debouncedFit);
 
       // Cleanup reconnect timeout
       if (reconnectTimeoutRef.current) {
@@ -250,6 +357,12 @@ export default function XTerminal({
       if (wsRef.current) {
         wsRef.current.close(1000, "Component unmounting");
         wsRef.current = null;
+      }
+
+      // Dispose WebGL addon to free up context (browsers limit to ~16)
+      if (webglAddonRef.current) {
+        webglAddonRef.current.dispose();
+        webglAddonRef.current = null;
       }
 
       // Dispose terminal and clear container
@@ -323,6 +436,18 @@ export default function XTerminal({
       >
         <span>WS.{workspaceId.slice(0, 8).toUpperCase()}</span>
         <span style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
+          {/* Flow control buffering indicator */}
+          {isBuffering && (
+            <span
+              style={{
+                color: "var(--warning)",
+                fontSize: "0.5625rem",
+                animation: "pulse 1s ease-in-out infinite",
+              }}
+            >
+              Buffering...
+            </span>
+          )}
           <span
             style={{
               width: "6px",

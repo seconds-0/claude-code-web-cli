@@ -13,7 +13,10 @@ import { getDb } from "../db.js";
 import { workspaces } from "@ccc/db";
 import { validateSessionToken } from "../services/session.js";
 
-// Connection tracking
+// Flow control constants - must match client's watermarks
+const MAX_BUFFER_SIZE = 2_000_000; // 2MB max buffer before dropping data
+
+// Connection tracking with flow control state
 const connections = new Map<
   string,
   {
@@ -21,6 +24,10 @@ const connections = new Map<
     ttydWs: WebSocket | null;
     workspaceId: string;
     userId: string;
+    // Flow control state
+    flowPaused: boolean;
+    buffer: Buffer[];
+    bufferSize: number;
   }
 >();
 
@@ -165,21 +172,43 @@ async function handleConnection(clientWs: WebSocket, request: IncomingMessage): 
     return;
   }
 
-  // Store connection info
+  // Store connection info with flow control state
   connections.set(connectionId, {
     clientWs,
     ttydWs: null,
     workspaceId,
     userId,
+    flowPaused: false,
+    buffer: [],
+    bufferSize: 0,
   });
 
   // Connect to ttyd
   try {
     const ttydWs = await connectToTtyd(
       tailscaleIp,
-      // Forward ttyd messages to client
+      // Forward ttyd messages to client with flow control
       (data) => {
-        if (clientWs.readyState === WebSocket.OPEN) {
+        const conn = connections.get(connectionId);
+        if (!conn || clientWs.readyState !== WebSocket.OPEN) return;
+
+        if (conn.flowPaused) {
+          // Client requested pause - buffer the data
+          if (conn.bufferSize < MAX_BUFFER_SIZE) {
+            conn.buffer.push(data);
+            conn.bufferSize += data.length;
+          } else {
+            // Buffer full - drop oldest data to prevent memory explosion
+            while (conn.bufferSize > MAX_BUFFER_SIZE / 2 && conn.buffer.length > 0) {
+              const dropped = conn.buffer.shift();
+              if (dropped) conn.bufferSize -= dropped.length;
+            }
+            conn.buffer.push(data);
+            conn.bufferSize += data.length;
+            console.warn(`[terminal] Connection ${connectionId} buffer full, dropping old data`);
+          }
+        } else {
+          // Normal flow - forward directly
           clientWs.send(data);
         }
       },
@@ -209,8 +238,43 @@ async function handleConnection(clientWs: WebSocket, request: IncomingMessage): 
     // Remove early message handler and set up the real one
     clientWs.removeListener("message", earlyMessageHandler);
 
-    // Forward client messages to ttyd
+    // Forward client messages to ttyd (with flow control handling)
     clientWs.on("message", (data: Buffer) => {
+      // Check if this is a flow control message (JSON string)
+      const str = data.toString();
+      if (str.startsWith("{")) {
+        try {
+          const msg = JSON.parse(str);
+          if (msg.type === "flow") {
+            const conn = connections.get(connectionId);
+            if (!conn) return;
+
+            if (msg.ready) {
+              // Client ready to receive - flush buffer and resume
+              console.log(
+                `[terminal] Connection ${connectionId} flow resumed, flushing ${conn.buffer.length} buffered messages`
+              );
+              conn.flowPaused = false;
+              // Flush buffered data
+              for (const bufferedData of conn.buffer) {
+                if (clientWs.readyState === WebSocket.OPEN) {
+                  clientWs.send(bufferedData);
+                }
+              }
+              conn.buffer = [];
+              conn.bufferSize = 0;
+            } else {
+              // Client requested pause
+              console.log(`[terminal] Connection ${connectionId} flow paused by client`);
+              conn.flowPaused = true;
+            }
+            return; // Don't forward flow control messages to ttyd
+          }
+        } catch {
+          // Not JSON, forward to ttyd
+        }
+      }
+
       if (ttydWs.readyState === WebSocket.OPEN) {
         ttydWs.send(data);
       }
