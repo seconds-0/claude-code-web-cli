@@ -17,8 +17,8 @@ app.use(
   "*",
   cors({
     origin: (origin) => {
-      // Allow localhost for development
-      if (origin === "http://localhost:3000") return origin;
+      // Allow localhost for development (multiple ports)
+      if (origin?.startsWith("http://localhost:")) return origin;
       // Allow specific Vercel preview/production URLs
       // In production, set ALLOWED_ORIGINS env var
       const allowedOrigins = process.env["ALLOWED_ORIGINS"]?.split(",") ?? [];
