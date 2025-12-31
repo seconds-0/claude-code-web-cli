@@ -29,6 +29,7 @@ export default function XTerminal({
   const fitAddonRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initCalledRef = useRef(false);
 
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
@@ -63,14 +64,7 @@ export default function XTerminal({
         // Send initial resize message so ttyd knows terminal dimensions
         if (xtermRef.current) {
           const { cols, rows } = xtermRef.current;
-          console.log(`[XTerminal] Sending initial resize: ${cols}x${rows}`);
-          const message = new Uint8Array(5);
-          message[0] = 1; // Resize message type
-          message[1] = (cols >> 8) & 0xff;
-          message[2] = cols & 0xff;
-          message[3] = (rows >> 8) & 0xff;
-          message[4] = rows & 0xff;
-          ws.send(message);
+          ws.send(JSON.stringify({ columns: cols, rows: rows }));
         }
       };
 
@@ -88,19 +82,19 @@ export default function XTerminal({
               xtermRef.current.write(event.data);
             }
           } else {
-            // Binary data from ttyd - first byte is message type
+            // Binary data from ttyd - first byte is message type (ASCII character)
+            // ttyd uses ASCII: '0' (48) = output, '1' (49) = title, '2' (50) = prefs
             const data = new Uint8Array(event.data);
             if (data.length > 0) {
               const msgType = data[0];
               const payload = data.slice(1);
-              if (msgType === 0) {
-                // Output message - write to terminal
-                xtermRef.current.write(payload);
-              } else if (msgType === 1) {
-                // Window title - ignore for now
-              } else if (msgType === 2) {
-                // Set preferences - ignore for now
+              if (msgType === 48) {
+                // '0' = Output message - write to terminal as string
+                const decoder = new TextDecoder();
+                const text = decoder.decode(payload);
+                xtermRef.current.write(text);
               }
+              // '1' (49) = title, '2' (50) = prefs - ignored for now
             }
           }
         }
@@ -153,9 +147,18 @@ export default function XTerminal({
     const initTerminal = async () => {
       if (!terminalRef.current) return;
 
+      // Prevent double initialization from React StrictMode
+      if (initCalledRef.current) return;
+      initCalledRef.current = true;
+
+      // Clear any existing terminal content
+      terminalRef.current.innerHTML = "";
+
       // Dynamically import xterm modules (client-side only)
       const { Terminal } = await import("@xterm/xterm");
       const { FitAddon } = await import("@xterm/addon-fit");
+      // Canvas addon disabled for debugging
+      // const { CanvasAddon } = await import("@xterm/addon-canvas");
 
       term = new Terminal({
         cursorBlink: true,
@@ -191,32 +194,25 @@ export default function XTerminal({
       term.loadAddon(fitAddon);
 
       term.open(terminalRef.current);
+
+      // Canvas addon disabled for debugging - using DOM renderer
+      // const canvasAddon = new CanvasAddon();
+      // term.loadAddon(canvasAddon);
+
       fitAddon.fit();
 
-      // Handle terminal input - ttyd protocol: byte 0 + data
+      // Handle terminal input - ttyd expects '0' + data as text string
       term.onData((data) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-          const encoder = new TextEncoder();
-          const textBytes = encoder.encode(data);
-          // ttyd input protocol: first byte is 0 (input), followed by data
-          const message = new Uint8Array(1 + textBytes.length);
-          message[0] = 0; // Input message type
-          message.set(textBytes, 1);
-          wsRef.current.send(message);
+          // ttyd input protocol: '0' prefix + data as text
+          wsRef.current.send("0" + data);
         }
       });
 
-      // Handle terminal resize - ttyd protocol: byte 1 + uint16 cols + uint16 rows
+      // Handle terminal resize - ttyd expects JSON text
       term.onResize(({ cols, rows }) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-          // ttyd resize protocol: byte 1 + cols (uint16 BE) + rows (uint16 BE)
-          const message = new Uint8Array(5);
-          message[0] = 1; // Resize message type
-          message[1] = (cols >> 8) & 0xff;
-          message[2] = cols & 0xff;
-          message[3] = (rows >> 8) & 0xff;
-          message[4] = rows & 0xff;
-          wsRef.current.send(message);
+          wsRef.current.send(JSON.stringify({ columns: cols, rows: rows }));
         }
       });
 

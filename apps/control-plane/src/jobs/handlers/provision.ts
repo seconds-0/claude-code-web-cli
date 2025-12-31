@@ -57,6 +57,9 @@ runcmd:
   # Connect to Tailscale
   - tailscale up --authkey=${tailscaleAuthKey} --hostname=${hostname}
 
+  # Wait for Tailscale interface to be ready (ttyd binds to tailscale0)
+  - for i in $(seq 1 30); do tailscale status && break || sleep 2; done
+
   # Mount persistent volume if attached
   ${
     volumeDevice

@@ -102,6 +102,15 @@ async function handleConnection(clientWs: WebSocket, request: IncomingMessage): 
 
   console.log(`[terminal] New connection ${connectionId}`);
 
+  // Buffer for messages received before ttyd connection is established
+  const pendingMessages: Buffer[] = [];
+
+  // Set up early message handler to buffer messages until ttyd is connected
+  const earlyMessageHandler = (data: Buffer) => {
+    pendingMessages.push(data);
+  };
+  clientWs.on("message", earlyMessageHandler);
+
   // Validate session token
   if (!token) {
     console.log(`[terminal] Connection ${connectionId} - no token provided`);
@@ -197,12 +206,25 @@ async function handleConnection(clientWs: WebSocket, request: IncomingMessage): 
       conn.ttydWs = ttydWs;
     }
 
+    // Remove early message handler and set up the real one
+    clientWs.removeListener("message", earlyMessageHandler);
+
     // Forward client messages to ttyd
     clientWs.on("message", (data: Buffer) => {
       if (ttydWs.readyState === WebSocket.OPEN) {
         ttydWs.send(data);
       }
     });
+
+    // Flush any buffered messages
+    if (pendingMessages.length > 0) {
+      for (const msg of pendingMessages) {
+        if (ttydWs.readyState === WebSocket.OPEN) {
+          ttydWs.send(msg);
+        }
+      }
+      pendingMessages.length = 0;
+    }
 
     // Handle client close
     clientWs.on("close", () => {
