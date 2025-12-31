@@ -17,6 +17,9 @@ interface XTerminalProps {
 // Connection states
 type ConnectionState = "connecting" | "connected" | "disconnected" | "error";
 
+// Module-level tracking to prevent StrictMode double-init race conditions
+const initializedContainers = new WeakSet<HTMLElement>();
+
 export default function XTerminal({
   workspaceId,
   sessionToken,
@@ -29,7 +32,6 @@ export default function XTerminal({
   const fitAddonRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const initCalledRef = useRef(false);
 
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
@@ -148,8 +150,11 @@ export default function XTerminal({
       if (!terminalRef.current) return;
 
       // Prevent double initialization from React StrictMode
-      if (initCalledRef.current) return;
-      initCalledRef.current = true;
+      // Use module-level WeakSet for synchronous check that survives React's lifecycle
+      if (initializedContainers.has(terminalRef.current)) {
+        return;
+      }
+      initializedContainers.add(terminalRef.current);
 
       // Clear any existing terminal content
       terminalRef.current.innerHTML = "";
@@ -248,11 +253,18 @@ export default function XTerminal({
         wsRef.current = null;
       }
 
-      // Dispose terminal
+      // Dispose terminal and clear container
       if (term) {
         term.dispose();
         xtermRef.current = null;
         fitAddonRef.current = null;
+      }
+
+      // Clear the container and remove from tracking
+      // This allows re-initialization on the next mount cycle
+      if (terminalRef.current) {
+        terminalRef.current.innerHTML = "";
+        initializedContainers.delete(terminalRef.current);
       }
     };
   }, [connect]);
