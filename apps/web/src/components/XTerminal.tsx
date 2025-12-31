@@ -53,7 +53,7 @@ export default function XTerminal({
   const isPausedRef = useRef(false);
 
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
-  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const reconnectAttemptRef = useRef(0); // Use ref to avoid triggering effect re-runs
   const [isBuffering, setIsBuffering] = useState(false); // UX indicator for flow control
 
   const MAX_RECONNECT_ATTEMPTS = 5;
@@ -80,7 +80,7 @@ export default function XTerminal({
       ws.onopen = () => {
         console.log("[XTerminal] WebSocket connected");
         setConnectionState("connected");
-        setReconnectAttempt(0);
+        reconnectAttemptRef.current = 0;
         onConnect?.();
 
         // Send initial resize message so ttyd knows terminal dimensions
@@ -174,12 +174,12 @@ export default function XTerminal({
           setConnectionState("disconnected");
           onDisconnect?.();
 
-          if (reconnectAttempt < MAX_RECONNECT_ATTEMPTS) {
+          if (reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
+            reconnectAttemptRef.current += 1;
             console.log(
-              `[XTerminal] Reconnecting in ${RECONNECT_DELAY_MS}ms (attempt ${reconnectAttempt + 1})`
+              `[XTerminal] Reconnecting in ${RECONNECT_DELAY_MS}ms (attempt ${reconnectAttemptRef.current})`
             );
             reconnectTimeoutRef.current = setTimeout(() => {
-              setReconnectAttempt((prev) => prev + 1);
               connect();
             }, RECONNECT_DELAY_MS);
           } else {
@@ -202,7 +202,7 @@ export default function XTerminal({
       setConnectionState("error");
       onError?.(error instanceof Error ? error.message : "Connection failed");
     }
-  }, [wsUrl, onConnect, onDisconnect, onError, reconnectAttempt]);
+  }, [wsUrl, onConnect, onDisconnect, onError]);
 
   // Initialize terminal
   useEffect(() => {
@@ -230,7 +230,7 @@ export default function XTerminal({
       term = new Terminal({
         cursorBlink: false, // Saves periodic renders
         cursorStyle: "block",
-        fontSize: 16,
+        fontSize: 14,
         lineHeight: 1.2,
         fontFamily: "'JetBrains Mono', 'SF Mono', 'Menlo', monospace",
         scrollback: 2000, // ~12MB memory, practical history
@@ -413,9 +413,7 @@ export default function XTerminal({
       case "connected":
         return "Connected";
       case "connecting":
-        return reconnectAttempt > 0
-          ? `Reconnecting (${reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})`
-          : "Connecting...";
+        return "Connecting...";
       case "disconnected":
         return "Disconnected";
       case "error":
