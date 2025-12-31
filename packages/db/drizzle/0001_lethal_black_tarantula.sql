@@ -1,0 +1,1 @@
+ALTER TABLE "workspaces" ADD COLUMN "private_mode" boolean DEFAULT false NOT NULL;

@@ -22,6 +22,8 @@ export const workspaceSchema = z.object({
   userId: uuidSchema,
   name: z.string(),
   status: workspaceStatusSchema,
+  // Private mode: Tailscale-only networking (more secure but ~300ms higher latency)
+  privateMode: z.boolean().default(false),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });
@@ -49,6 +51,14 @@ export const workspaceInstanceSchema = z.object({
 // Request schemas
 export const createWorkspaceRequestSchema = z.object({
   name: z.string().min(1).max(100).optional(),
+  // Private mode: Tailscale-only networking (default: false for low-latency)
+  privateMode: z.boolean().optional().default(false),
+});
+
+// Update request schema for changing workspace settings
+export const updateWorkspaceRequestSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  privateMode: z.boolean().optional(),
 });
 
 // Response schemas
@@ -68,5 +78,6 @@ export type Workspace = z.infer<typeof workspaceSchema>;
 export type WorkspaceVolume = z.infer<typeof workspaceVolumeSchema>;
 export type WorkspaceInstance = z.infer<typeof workspaceInstanceSchema>;
 export type CreateWorkspaceRequest = z.infer<typeof createWorkspaceRequestSchema>;
+export type UpdateWorkspaceRequest = z.infer<typeof updateWorkspaceRequestSchema>;
 export type WorkspaceResponse = z.infer<typeof workspaceResponseSchema>;
 export type WorkspacesResponse = z.infer<typeof workspacesResponseSchema>;

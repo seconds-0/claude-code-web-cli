@@ -6,12 +6,14 @@ import TerminalSection from "@/components/TerminalSection";
 import StatusBadge from "@/components/StatusBadge";
 import { PanelStat } from "@/components/Panel";
 import WorkspaceStatusPoller from "@/components/WorkspaceStatusPoller";
+import PrivateModeToggle from "@/components/PrivateModeToggle";
 import { getApiUrl } from "@/lib/config";
 
 interface Workspace {
   id: string;
   name: string;
   status: "pending" | "provisioning" | "ready" | "suspended";
+  privateMode: boolean;
   createdAt: string;
   updatedAt: string;
   volume?: {
@@ -228,6 +230,23 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Settings Section */}
+      <div style={{ marginTop: "2rem" }}>
+        <div
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.625rem",
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+            color: "var(--muted)",
+            marginBottom: "0.75rem",
+          }}
+        >
+          SETTINGS
+        </div>
+        <PrivateModeToggle workspaceId={workspace.id} initialValue={workspace.privateMode} />
       </div>
 
       {/* Footer */}

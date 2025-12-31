@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, integer, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, integer, uniqueIndex, boolean } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // Users table
@@ -18,6 +18,9 @@ export const workspaces = pgTable("workspaces", {
     .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull().default("default"),
   status: text("status").notNull().default("pending"), // pending, provisioning, ready, suspended, error
+  // Private mode: Tailscale-only networking (more secure but ~300ms higher latency)
+  // When false (default): Direct connect enabled for low-latency terminal access
+  privateMode: boolean("private_mode").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

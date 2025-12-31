@@ -156,7 +156,7 @@ export default function NewWorkspacePage() {
                 }}
               >
                 <div>
-                  <span style={{ color: "var(--muted)" }}>STORAGE:</span> 20 GB
+                  <span style={{ color: "var(--muted)" }}>STORAGE:</span> 50 GB
                 </div>
                 <div>
                   <span style={{ color: "var(--muted)" }}>REGION:</span> AUTO
@@ -165,7 +165,13 @@ export default function NewWorkspacePage() {
                   <span style={{ color: "var(--muted)" }}>TIER:</span> SUSPEND
                 </div>
                 <div>
+                  <span style={{ color: "var(--muted)" }}>NETWORK:</span> DIRECT
+                </div>
+                <div>
                   <span style={{ color: "var(--muted)" }}>CLAUDE:</span> INCLUDED
+                </div>
+                <div>
+                  <span style={{ color: "var(--muted)" }}>LATENCY:</span> ~50MS
                 </div>
               </div>
             </div>

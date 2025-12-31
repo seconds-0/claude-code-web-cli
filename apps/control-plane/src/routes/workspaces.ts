@@ -69,6 +69,7 @@ workspacesRoute.get("/", async (c) => {
       userId: w.userId,
       name: w.name,
       status: w.status as "pending" | "provisioning" | "ready" | "suspended" | "error",
+      privateMode: w.privateMode,
       createdAt: w.createdAt.toISOString(),
       updatedAt: w.updatedAt.toISOString(),
     })),
@@ -82,14 +83,15 @@ workspacesRoute.post("/", async (c) => {
   const dbUserId = c.get("dbUserId");
   const db = getDb();
 
-  let body: CreateWorkspaceRequest = {};
+  let body: Partial<CreateWorkspaceRequest> = {};
   try {
     body = await c.req.json();
   } catch {
-    // Empty body is fine, name is optional
+    // Empty body is fine, all fields are optional
   }
 
   const name = body.name || "default";
+  const privateMode = body.privateMode ?? false; // Default to false for low-latency direct connect
 
   // Create workspace
   const workspaceResult = await db
@@ -97,6 +99,7 @@ workspacesRoute.post("/", async (c) => {
     .values({
       userId: dbUserId,
       name,
+      privateMode,
       status: "pending",
     })
     .returning();
@@ -141,6 +144,7 @@ workspacesRoute.post("/", async (c) => {
       userId: workspace.userId,
       name: workspace.name,
       status: workspace.status as "pending" | "provisioning" | "ready" | "suspended" | "error",
+      privateMode: workspace.privateMode,
       createdAt: workspace.createdAt.toISOString(),
       updatedAt: workspace.updatedAt.toISOString(),
     },
@@ -196,6 +200,7 @@ workspacesRoute.get("/:id", async (c) => {
       userId: workspace.userId,
       name: workspace.name,
       status: workspace.status as "pending" | "provisioning" | "ready" | "suspended" | "error",
+      privateMode: workspace.privateMode,
       createdAt: workspace.createdAt.toISOString(),
       updatedAt: workspace.updatedAt.toISOString(),
     },
@@ -251,10 +256,14 @@ workspacesRoute.patch("/:id", async (c) => {
   }
 
   const body = await c.req.json();
-  const updates: Partial<{ name: string }> = {};
+  const updates: Partial<{ name: string; privateMode: boolean }> = {};
 
   if (body.name && typeof body.name === "string") {
     updates.name = body.name;
+  }
+
+  if (typeof body.privateMode === "boolean") {
+    updates.privateMode = body.privateMode;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -278,6 +287,7 @@ workspacesRoute.patch("/:id", async (c) => {
       userId: updated.userId,
       name: updated.name,
       status: updated.status as "pending" | "provisioning" | "ready" | "suspended" | "error",
+      privateMode: updated.privateMode,
       createdAt: updated.createdAt.toISOString(),
       updatedAt: updated.updatedAt.toISOString(),
     },
@@ -468,6 +478,17 @@ workspacesRoute.get("/:id/direct-connect", async (c) => {
   // Check if workspace is running
   if (workspace.instance?.status !== "running") {
     return c.json({ error: "conflict", message: "Workspace is not running" }, 409);
+  }
+
+  // Check if private mode is enabled (Tailscale-only, no direct connect)
+  if (workspace.privateMode) {
+    return c.json({
+      available: false,
+      reason: "private_mode",
+      message:
+        "Direct connect is disabled. This workspace is in Private Mode (Tailscale-only networking).",
+      relayUrl: `/ws/terminal`,
+    });
   }
 
   // Check if workspace has direct connect enabled

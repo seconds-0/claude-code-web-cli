@@ -8,7 +8,29 @@ Long-term planning hub. Update when starting/completing work or discovering new 
 
 ## In Progress
 
-<!-- Currently being worked on -->
+### Terminal Latency Fix (500ms → <100ms)
+
+**Goal:** Snappy terminal typing experience
+
+#### Phase 1: Local Echo (Immediate)
+
+- [ ] Add `xterm-local-echo` package
+- [ ] Integrate local echo addon in `XTerminal.tsx`
+
+#### Phase 2: Direct Connect Mode (Default for new users)
+
+- [ ] Add Caddy reverse proxy to box image (`box/scripts/install-caddy.sh`)
+- [ ] Configure JWT validation in Caddyfile
+- [ ] New endpoint: `GET /api/v1/workspaces/:id/terminal-url`
+- [ ] Frontend: dual-mode connection (direct first, relay fallback)
+- [ ] **Default onboarding to direct connect** (best first impression)
+
+#### Phase 3: Private Mode Option
+
+- [ ] Add `privateMode: boolean` to workspace schema (default: false)
+- [ ] Add "Private Mode" toggle in workspace settings
+- [ ] Warning text: "Adds latency (~300ms) but keeps workspace on private network"
+- [ ] When enabled: disable direct connect, use Tailscale relay only
 
 ---
 

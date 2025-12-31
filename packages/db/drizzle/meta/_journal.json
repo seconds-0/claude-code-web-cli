@@ -8,6 +8,13 @@
       "when": 1767050557802,
       "tag": "0000_sloppy_ultimo",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1767179139587,
+      "tag": "0001_lethal_black_tarantula",
+      "breakpoints": true
     }
   ]
 }
