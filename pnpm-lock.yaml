@@ -141,6 +141,9 @@ importers:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
+      xterm-local-echo:
+        specifier: ^1.0.0
+        version: 1.0.0
 
   packages/api-contract:
     dependencies:
@@ -1977,6 +1980,13 @@ packages:
       }
     engines: { node: ">=18" }
 
+  ansi-regex@3.0.1:
+    resolution:
+      {
+        integrity: sha512-+O9Jct8wf++lXxxFc4hc8LsjaSq0HFzzL7cVsw8pRDIPdjKD2mT4ytDZlLuSBZ4cLKZFXIrMGO7DbQCtMJJMKw==,
+      }
+    engines: { node: ">=4" }
+
   ansi-regex@6.2.2:
     resolution:
       {
@@ -2052,6 +2062,13 @@ packages:
         integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==,
       }
     engines: { node: ">=12" }
+
+  astral-regex@1.0.0:
+    resolution:
+      {
+        integrity: sha512-+Ryf6g3BKoRc7jfp7ad8tM4TtMiaWvbF/1/sQcZPkkS7ag3D5nMBCe2UfOTONtAkaG0tO0ij3C5Lwmf1EiyjHg==,
+      }
+    engines: { node: ">=4" }
 
   async-function@1.0.0:
     resolution:
@@ -4030,6 +4047,13 @@ packages:
       }
     engines: { node: ">=0.6.19" }
 
+  string-length@2.0.0:
+    resolution:
+      {
+        integrity: sha512-Qka42GGrS8Mm3SZ+7cH8UXiIWI867/b/Z/feQSpQx/rbfB8UGknGEZVaUQMOUVj+soY6NpWAxily63HI1OckVQ==,
+      }
+    engines: { node: ">=4" }
+
   string-width@7.2.0:
     resolution:
       {
@@ -4057,6 +4081,13 @@ packages:
         integrity: sha512-UXSH262CSZY1tfu3G3Secr6uGLCFVPMhIqHjlgCUtCCcgihYc/xKs9djMTMUOb2j1mVSeU8EU6NWc/iQKU6Gfg==,
       }
     engines: { node: ">= 0.4" }
+
+  strip-ansi@4.0.0:
+    resolution:
+      {
+        integrity: sha512-4XaJ2zQdCzROZDivEVIDPkcQn8LMFSa8kj8Gxb/Lnwzv9A8VctNZ+lfivC/sV3ivW8ElJTERXZoPBRrZKkNKow==,
+      }
+    engines: { node: ">=4" }
 
   strip-ansi@7.1.2:
     resolution:
@@ -4475,6 +4506,12 @@ packages:
         optional: true
       utf-8-validate:
         optional: true
+
+  xterm-local-echo@1.0.0:
+    resolution:
+      {
+        integrity: sha512-9l5+yd6A6zcGg51JFwUtAaPlNaA7Wk56AdYrMhvFPaQPm+r9mVrg56APWv2GzXJUHHi3cIvebw/gGjDSjnhI6A==,
+      }
 
   yaml@2.8.2:
     resolution:
@@ -5308,6 +5345,8 @@ snapshots:
     dependencies:
       environment: 1.1.0
 
+  ansi-regex@3.0.1: {}
+
   ansi-regex@6.2.2: {}
 
   ansi-styles@4.3.0:
@@ -5369,6 +5408,8 @@ snapshots:
       is-array-buffer: 3.0.5
 
   assertion-error@2.0.1: {}
+
+  astral-regex@1.0.0: {}
 
   async-function@1.0.0: {}
 
@@ -6677,6 +6718,11 @@ snapshots:
 
   string-argv@0.3.2: {}
 
+  string-length@2.0.0:
+    dependencies:
+      astral-regex: 1.0.0
+      strip-ansi: 4.0.0
+
   string-width@7.2.0:
     dependencies:
       emoji-regex: 10.6.0
@@ -6705,6 +6751,10 @@ snapshots:
       call-bind: 1.0.8
       define-properties: 1.2.1
       es-object-atoms: 1.1.1
+
+  strip-ansi@4.0.0:
+    dependencies:
+      ansi-regex: 3.0.1
 
   strip-ansi@7.1.2:
     dependencies:
@@ -6980,6 +7030,11 @@ snapshots:
       strip-ansi: 7.1.2
 
   ws@8.18.3: {}
+
+  xterm-local-echo@1.0.0:
+    dependencies:
+      shell-quote: 1.8.3
+      string-length: 2.0.0
 
   yaml@2.8.2: {}
 
