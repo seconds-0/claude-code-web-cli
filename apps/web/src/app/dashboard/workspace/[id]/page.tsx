@@ -45,7 +45,18 @@ async function getWorkspace(id: string, token: string): Promise<Workspace | null
     }
 
     const data = await res.json();
-    return data.workspace;
+    // API returns workspace, volume, instance as separate properties
+    // Map tailscaleIp to ipAddress for UI compatibility
+    return {
+      ...data.workspace,
+      volume: data.volume,
+      instance: data.instance
+        ? {
+            ...data.instance,
+            ipAddress: data.instance.tailscaleIp,
+          }
+        : undefined,
+    };
   } catch (error) {
     console.error("Error fetching workspace:", error);
     return null;
