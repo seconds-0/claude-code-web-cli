@@ -73,29 +73,39 @@ The solution uses a hybrid approach: direct connect is the default (low latency)
 - Fixed storage display: 20GB → 50GB
 - Added `NETWORK: DIRECT` and `LATENCY: ~50MS` to specs
 
+### 5. Frontend Integration (Commit: 826a797)
+
+**Files:**
+
+- `apps/web/src/components/Terminal.tsx` - Tries direct connect first, falls back to relay
+- `apps/web/src/components/XTerminal.tsx` - Shows connection mode badge (DIRECT/RELAY)
+
+**How it works:**
+
+1. Terminal.tsx fetches `/api/v1/workspaces/:id/direct-connect`
+2. If `available: true`, uses the `directUrl` for WebSocket connection
+3. If not available (private mode or error), falls back to relay session
+4. XTerminal shows a green "DIRECT" badge or gray "RELAY" badge when connected
+
 ---
 
 ## What's NOT Done (Remaining Work)
 
-### Frontend Integration
+### VM Image Rebuild
 
-The XTerminal component needs to:
+The Packer config includes Caddy, but you need to rebuild the VM image:
 
-1. **Try direct connect first**, fall back to relay if unavailable:
+```bash
+cd box/packer
+packer init .
+HETZNER_API_TOKEN=xxx packer build ubuntu.pkr.hcl
+```
 
-   ```typescript
-   // Pseudo-code for XTerminal.tsx
-   async function connect() {
-     const directInfo = await fetch(`/api/v1/workspaces/${id}/direct-connect`);
-     if (directInfo.available) {
-       ws = new WebSocket(directInfo.directUrl);
-     } else {
-       ws = new WebSocket(`/ws/terminal?token=${token}`);
-     }
-   }
-   ```
+### Production Considerations
 
-2. **Add connection mode indicator** to terminal header (e.g., "DIRECT" or "RELAY")
+1. **TLS Certificates**: Currently using self-signed. For production, set up Let's Encrypt or Cloudflare
+2. **Cloud-init**: Automate enabling Caddy based on privateMode setting
+3. **Monitoring**: Track latency metrics to verify improvement
 
 ---
 
@@ -230,7 +240,8 @@ Browser → Fly.io Control Plane → Tailscale → Hetzner VM → ttyd
 
 ```
 apps/control-plane/src/routes/workspaces.ts  # Direct connect endpoint + privateMode
-apps/web/src/components/XTerminal.tsx         # Local echo
+apps/web/src/components/Terminal.tsx          # Direct connect with relay fallback
+apps/web/src/components/XTerminal.tsx         # Local echo + connection mode badge
 apps/web/src/components/PrivateModeToggle.tsx # NEW: Toggle component
 apps/web/src/app/dashboard/workspace/[id]/page.tsx  # Settings section
 apps/web/src/app/dashboard/new/page.tsx       # Onboarding specs
