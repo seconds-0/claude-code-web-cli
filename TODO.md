@@ -8,29 +8,15 @@ Long-term planning hub. Update when starting/completing work or discovering new 
 
 ## In Progress
 
-### Terminal Latency Fix (500ms → <100ms)
+### Terminal Latency Fix: Frontend Integration
 
-**Goal:** Snappy terminal typing experience
+**Goal:** Connect XTerminal to direct connect endpoint
 
-#### Phase 1: Local Echo (Immediate)
+**Remaining Work:**
 
-- [ ] Add `xterm-local-echo` package
-- [ ] Integrate local echo addon in `XTerminal.tsx`
-
-#### Phase 2: Direct Connect Mode (Default for new users)
-
-- [ ] Add Caddy reverse proxy to box image (`box/scripts/install-caddy.sh`)
-- [ ] Configure JWT validation in Caddyfile
-- [ ] New endpoint: `GET /api/v1/workspaces/:id/terminal-url`
-- [ ] Frontend: dual-mode connection (direct first, relay fallback)
-- [ ] **Default onboarding to direct connect** (best first impression)
-
-#### Phase 3: Private Mode Option
-
-- [ ] Add `privateMode: boolean` to workspace schema (default: false)
-- [ ] Add "Private Mode" toggle in workspace settings
-- [ ] Warning text: "Adds latency (~300ms) but keeps workspace on private network"
-- [ ] When enabled: disable direct connect, use Tailscale relay only
+- [ ] Frontend: Update XTerminal to try direct connect first, fall back to relay
+- [ ] Add "connected via direct" indicator in terminal header
+- [ ] Test end-to-end latency improvement
 
 ---
 
@@ -66,7 +52,7 @@ Long-term planning hub. Update when starting/completing work or discovering new 
 - [ ] Configure Clerk `afterSignUpUrl="/dashboard/setup"` (`apps/web/src/app/sign-up/[[...sign-up]]/page.tsx:13`)
 - [ ] Remove name input from first-run flow (default "My Workspace")
 - [ ] Add boot sequence animation during provisioning (replace "AWAITING_CONNECTION")
-- [ ] Fix storage mismatch: UI shows 20GB (`new/page.tsx:159`), backend defaults 50GB (`schema.ts:34`)
+- [x] Fix storage mismatch: UI shows 20GB → 50GB (DONE 2024-12-31)
 
 **UX Polish**
 
@@ -135,9 +121,32 @@ Long-term planning hub. Update when starting/completing work or discovering new 
 
 <!-- Completed items with dates -->
 
+### Terminal Latency Fix (2024-12-31)
+
+**Backend:**
+
+- [x] Local echo for immediate latency improvement (commit: 955e936)
+- [x] Direct connect infrastructure: Caddy + JWT on VMs (commit: d7a7524)
+- [x] Add Caddy reverse proxy to box image (`box/scripts/install-caddy.sh`)
+- [x] Configure JWT validation + rate limiting in Caddyfile
+- [x] New endpoint: `GET /api/v1/workspaces/:id/direct-connect`
+- [x] JWT with IP binding, 5-minute TTL
+
+**Private Mode Option:**
+
+- [x] Add `privateMode: boolean` to workspace schema (default: false) (commit: 3e82a01)
+- [x] Add "Private Mode" toggle in workspace settings (`PrivateModeToggle.tsx`)
+- [x] Warning text about latency tradeoff
+- [x] Direct-connect endpoint respects privateMode setting
+- [x] Database migration for privateMode column
+
+**Other:**
+
 - [x] Happy Coder competitive analysis (2024-12-31)
 - [x] Created roadmap infrastructure (2024-12-31)
 - [x] P0 onboarding audit with Codex + Gemini (2024-12-31)
+- [x] Onboarding specs updated (NETWORK: DIRECT, LATENCY: ~50MS)
+- [x] Fixed storage display (20GB → 50GB)
 
 ---
 
