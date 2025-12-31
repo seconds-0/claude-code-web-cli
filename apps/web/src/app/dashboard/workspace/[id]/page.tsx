@@ -70,9 +70,10 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
   const canStart =
     workspace.status === "pending" ||
     workspace.status === "suspended" ||
-    workspace.instance?.status === "stopped";
+    workspace.instance?.status === "stopped" ||
+    (workspace.status === "ready" && !workspace.instance);
   const canStop = workspace.instance?.status === "running";
-  const canSuspend = workspace.status === "ready";
+  const canSuspend = workspace.status === "ready" && workspace.instance?.status === "running";
   const isTerminalReady = workspace.instance?.status === "running";
 
   return (
