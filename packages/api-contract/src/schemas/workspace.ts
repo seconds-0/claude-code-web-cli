@@ -49,6 +49,8 @@ export const workspaceInstanceSchema = z.object({
 // Request schemas
 export const createWorkspaceRequestSchema = z.object({
   name: z.string().min(1).max(100).optional(),
+  /** If true, immediately start provisioning after creation */
+  autoStart: z.boolean().optional(),
 });
 
 // Response schemas

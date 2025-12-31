@@ -10,7 +10,7 @@ export default function SignUpPage() {
         minHeight: "100vh",
       }}
     >
-      <SignUp />
+      <SignUp afterSignUpUrl="/dashboard/setup" afterSignInUrl="/dashboard" />
     </div>
   );
 }

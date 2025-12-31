@@ -156,7 +156,7 @@ export default function NewWorkspacePage() {
                 }}
               >
                 <div>
-                  <span style={{ color: "var(--muted)" }}>STORAGE:</span> 20 GB
+                  <span style={{ color: "var(--muted)" }}>STORAGE:</span> 50 GB
                 </div>
                 <div>
                   <span style={{ color: "var(--muted)" }}>REGION:</span> AUTO
