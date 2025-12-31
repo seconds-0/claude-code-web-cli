@@ -162,8 +162,7 @@ export default function XTerminal({
       // Dynamically import xterm modules (client-side only)
       const { Terminal } = await import("@xterm/xterm");
       const { FitAddon } = await import("@xterm/addon-fit");
-      // Canvas addon disabled for debugging
-      // const { CanvasAddon } = await import("@xterm/addon-canvas");
+      const { ClipboardAddon } = await import("@xterm/addon-clipboard");
 
       term = new Terminal({
         cursorBlink: true,
@@ -198,11 +197,11 @@ export default function XTerminal({
       fitAddon = new FitAddon();
       term.loadAddon(fitAddon);
 
-      term.open(terminalRef.current);
+      // Clipboard addon for copy/paste support
+      const clipboardAddon = new ClipboardAddon();
+      term.loadAddon(clipboardAddon);
 
-      // Canvas addon disabled for debugging - using DOM renderer
-      // const canvasAddon = new CanvasAddon();
-      // term.loadAddon(canvasAddon);
+      term.open(terminalRef.current);
 
       fitAddon.fit();
 
