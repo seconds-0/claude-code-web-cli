@@ -42,20 +42,20 @@ COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
-# Create startup script that works with Railway's start command
-RUN printf '#!/bin/sh\nexec node /app/apps/web/server.js\n' > /app/apps/web/start.sh && \
-    chmod +x /app/apps/web/start.sh && \
-    # Also create a pnpm shim that runs our start script
-    printf '#!/bin/sh\nexec /app/apps/web/start.sh\n' > /usr/local/bin/pnpm && \
-    chmod +x /usr/local/bin/pnpm && \
-    # Create cd shim to handle Railway's "cd apps/web && pnpm start" command
-    printf '#!/bin/sh\nexec /app/apps/web/start.sh\n' > /usr/local/bin/cd && \
-    chmod +x /usr/local/bin/cd
+# Create an entrypoint script that always starts the correct server
+# regardless of what start command Railway tries to run
+RUN printf '#!/bin/sh\n\
+# Log what we were asked to run (for debugging)\n\
+echo "Railway start command: $@"\n\
+# Always run the Next.js server\n\
+exec node /app/apps/web/server.js\n' > /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh
 
 ENV NODE_ENV=production
 ENV PORT=3000
 
 EXPOSE 3000
 
-# Default CMD - Railway may override with start command
-CMD ["node", "apps/web/server.js"]
+# Use ENTRYPOINT so it runs regardless of CMD override
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD []
