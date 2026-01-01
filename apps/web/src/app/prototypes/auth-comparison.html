@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Auth Flow Comparison</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #e5e5e5;
+      padding: 2rem;
+    }
+    h1 { text-align: center; margin-bottom: 2rem; color: #fff; }
+    .comparison {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .approach {
+      background: #1a1a1a;
+      border-radius: 12px;
+      padding: 1.5rem;
+      border: 1px solid #333;
+    }
+    .approach h2 {
+      color: #fff;
+      font-size: 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+    .approach .subtitle {
+      color: #888;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+    .flow-step {
+      background: #252525;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      border-left: 3px solid #666;
+    }
+    .flow-step.user { border-left-color: #3b82f6; }
+    .flow-step.system { border-left-color: #22c55e; }
+    .flow-step.external { border-left-color: #f59e0b; }
+    .step-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 0.25rem;
+    }
+    .step-content {
+      font-size: 0.9rem;
+    }
+    .pros-cons {
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid #333;
+    }
+    .pros, .cons {
+      margin-bottom: 0.75rem;
+    }
+    .pros h3 { color: #22c55e; font-size: 0.9rem; margin-bottom: 0.5rem; }
+    .cons h3 { color: #ef4444; font-size: 0.9rem; margin-bottom: 0.5rem; }
+    ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    li {
+      font-size: 0.85rem;
+      color: #aaa;
+      margin-bottom: 0.25rem;
+      padding-left: 1rem;
+      position: relative;
+    }
+    li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+    }
+    .complexity {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #1f1f1f;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .complexity-label {
+      font-size: 0.7rem;
+      color: #666;
+      text-transform: uppercase;
+    }
+    .complexity-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    .complexity-value.low { color: #22c55e; }
+    .complexity-value.medium { color: #f59e0b; }
+    .complexity-value.high { color: #ef4444; }
+    .recommendation {
+      margin-top: 2rem;
+      padding: 1.5rem;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      border-radius: 12px;
+      border: 1px solid #3b82f6;
+      max-width: 1400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .recommendation h2 {
+      color: #3b82f6;
+      margin-bottom: 1rem;
+    }
+    .arrow {
+      text-align: center;
+      color: #666;
+      font-size: 1.25rem;
+      margin: 0.5rem 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Claude Auth Flow Comparison</h1>
+
+  <div class="comparison">
+    <!-- Approach 1: In-Terminal OAuth -->
+    <div class="approach">
+      <h2>🖥️ In-Terminal OAuth</h2>
+      <div class="subtitle">First-time auth happens inside our terminal</div>
+
+      <div class="flow-step user">
+        <div class="step-label">Step 1 - User</div>
+        <div class="step-content">Signs up, workspace starts, sees terminal</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step user">
+        <div class="step-label">Step 2 - User</div>
+        <div class="step-content">Runs <code>claude</code> command in terminal</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step external">
+        <div class="step-label">Step 3 - External</div>
+        <div class="step-content">OAuth popup opens in browser → claude.ai</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step user">
+        <div class="step-label">Step 4 - User</div>
+        <div class="step-content">Authenticates with Anthropic account</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step system">
+        <div class="step-label">Step 5 - System</div>
+        <div class="step-content">Tokens saved to VM, we capture & store for future</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step system">
+        <div class="step-label">Step 6 - System</div>
+        <div class="step-content">Future workspaces get pre-injected tokens</div>
+      </div>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h3>✅ Pros</h3>
+          <ul>
+            <li>Standard Claude Code flow - users know it</li>
+            <li>No code copying required</li>
+            <li>Uses official OAuth redirect</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>❌ Cons</h3>
+          <ul>
+            <li>First workspace requires terminal access</li>
+            <li>Need to detect OAuth completion on VM</li>
+            <li>Terminal-first, not web-first</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="complexity">
+        <div class="complexity-label">Implementation Complexity</div>
+        <div class="complexity-value medium">Medium</div>
+      </div>
+    </div>
+
+    <!-- Approach 2: Copy-Paste OAuth -->
+    <div class="approach">
+      <h2>📋 Copy-Paste OAuth</h2>
+      <div class="subtitle">Auth via web form with code pasting</div>
+
+      <div class="flow-step user">
+        <div class="step-label">Step 1 - User</div>
+        <div class="step-content">Signs up, sees "Connect Claude" in dashboard</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step user">
+        <div class="step-label">Step 2 - User</div>
+        <div class="step-content">Clicks "Connect Claude" button</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step external">
+        <div class="step-label">Step 3 - External</div>
+        <div class="step-content">Popup opens → claude.ai OAuth</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step user">
+        <div class="step-label">Step 4 - User</div>
+        <div class="step-content">Authenticates, sees code, <strong>copies it</strong></div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step user">
+        <div class="step-label">Step 5 - User</div>
+        <div class="step-content">Pastes code into our form</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step system">
+        <div class="step-label">Step 6 - System</div>
+        <div class="step-content">Exchange code → tokens, encrypt & store</div>
+      </div>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h3>✅ Pros</h3>
+          <ul>
+            <li>Web-first experience</li>
+            <li>Auth before terminal access</li>
+            <li>Similar to gcloud --no-browser</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>❌ Cons</h3>
+          <ul>
+            <li>Manual copy-paste step</li>
+            <li>Code visible in browser history</li>
+            <li>Slightly clunky UX</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="complexity">
+        <div class="complexity-label">Implementation Complexity</div>
+        <div class="complexity-value low">Low</div>
+      </div>
+    </div>
+
+    <!-- Approach 3: Token Broker -->
+    <div class="approach">
+      <h2>🔐 Token Broker</h2>
+      <div class="subtitle">VMs request ephemeral tokens at runtime</div>
+
+      <div class="flow-step user">
+        <div class="step-label">Step 1 - User</div>
+        <div class="step-content">Authenticates once (either in-terminal or copy-paste)</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step system">
+        <div class="step-label">Step 2 - System</div>
+        <div class="step-content">Store ONLY refresh token server-side (encrypted)</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step system">
+        <div class="step-label">Step 3 - System</div>
+        <div class="step-content">VM boots with NO tokens pre-injected</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step system">
+        <div class="step-label">Step 4 - System</div>
+        <div class="step-content">VM calls our API for short-lived access token</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step system">
+        <div class="step-label">Step 5 - System</div>
+        <div class="step-content">Token expires in 15 min, VM re-requests</div>
+      </div>
+      <div class="arrow">↓</div>
+
+      <div class="flow-step system">
+        <div class="step-label">Step 6 - System</div>
+        <div class="step-content">Revocation instant - just stop issuing tokens</div>
+      </div>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h3>✅ Pros</h3>
+          <ul>
+            <li>Most secure - no long-lived tokens on VM</li>
+            <li>Instant revocation capability</li>
+            <li>Smaller blast radius if VM compromised</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>❌ Cons</h3>
+          <ul>
+            <li>VM needs network access to our API</li>
+            <li>More moving parts</li>
+            <li>Still needs initial auth (Option 1 or 2)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="complexity">
+        <div class="complexity-label">Implementation Complexity</div>
+        <div class="complexity-value high">High</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="recommendation">
+    <h2>💡 My Recommendation</h2>
+    <p style="color: #aaa; line-height: 1.6;">
+      <strong style="color: #fff;">Start with In-Terminal OAuth</strong> - it's the flow users already know from Claude Code.
+      The first workspace requires terminal access, but that's acceptable since they're about to use the terminal anyway.
+      We capture tokens after OAuth completes and inject into future workspaces.
+      <br><br>
+      <strong style="color: #fff;">Later, add Token Broker</strong> for security hardening.
+      This is an infrastructure improvement that doesn't change UX.
+      <br><br>
+      <strong style="color: #888;">Skip Copy-Paste</strong> - it's the worst of both worlds (web-first but clunky).
+    </p>
+  </div>
+</body>
+</html>
