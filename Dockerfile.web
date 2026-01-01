@@ -20,15 +20,17 @@ COPY packages/ ./packages/
 COPY apps/web/ ./apps/web/
 COPY turbo.json ./
 
-# Build arguments for Next.js public env vars (baked in at build time)
+# Build arguments - Railway passes env vars as build args automatically
 ARG NEXT_PUBLIC_CONTROL_PLANE_URL
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
-ENV NEXT_PUBLIC_CONTROL_PLANE_URL=$NEXT_PUBLIC_CONTROL_PLANE_URL
-ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+# Make them available as env vars during build (required for Next.js)
+ENV NEXT_PUBLIC_CONTROL_PLANE_URL=${NEXT_PUBLIC_CONTROL_PLANE_URL}
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
 
 # Build
-RUN pnpm turbo run build --filter=@ccc/web
+RUN echo "Building with NEXT_PUBLIC_CONTROL_PLANE_URL=${NEXT_PUBLIC_CONTROL_PLANE_URL}" && \
+    pnpm turbo run build --filter=@ccc/web
 
 # Production stage
 FROM node:20-slim AS runner
