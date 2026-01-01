@@ -1,8 +1,8 @@
 # Build stage
 FROM node:20-slim AS builder
 
-# Install pnpm
-RUN npm install -g pnpm@9.15.0
+# Enable pnpm via corepack (built into Node.js 16+, more memory-efficient)
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
 WORKDIR /app
 
