@@ -47,5 +47,5 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-# Railway uses startCommand from railway.toml to override this
-CMD ["node", "/app/apps/web/server.js"]
+# Standalone server.js is at /app/server.js after COPY
+CMD ["node", "/app/server.js"]
