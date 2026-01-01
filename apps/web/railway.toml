@@ -1,6 +1,7 @@
 [build]
-builder = "dockerfile"
-dockerfilePath = "../../Dockerfile.web"
+builder = "nixpacks"
+nixpacksConfigPath = "../../nixpacks.toml"
+watchPatterns = ["apps/web/**", "packages/**", "nixpacks.toml", "turbo.json", "package.json", "pnpm-lock.yaml"]
 
 [deploy]
 healthcheckPath = "/"
