@@ -47,5 +47,5 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-# Standalone server.js is at /app/server.js after COPY
-CMD ["node", "/app/server.js"]
+# Standalone preserves monorepo structure, server.js is at apps/web/
+CMD ["node", "/app/apps/web/server.js"]
