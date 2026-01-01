@@ -26,6 +26,8 @@ import { workspaces, workspaceVolumes, workspaceInstances } from "@ccc/db";
 import { createHetznerService, type HetznerServer } from "../../services/hetzner.js";
 import { createTailscaleService, type TailscaleDevice } from "../../services/tailscale.js";
 import type { ProvisionJob } from "../queue.js";
+import { generateCaptureToken, getTokensForUser } from "../../routes/anthropic.js";
+import type { TokenBlob } from "../../services/encryption.js";
 
 // Cloud-init template for user boxes
 function generateCloudInit(params: {
@@ -33,8 +35,61 @@ function generateCloudInit(params: {
   hostname: string;
   volumeDevice?: string;
   sshPublicKey?: string;
+  // Anthropic OAuth tokens (if user already authenticated)
+  anthropicTokens?: TokenBlob;
+  // Capture token for VM to send new tokens back to API
+  captureToken?: string;
+  // API URL for token capture
+  apiUrl?: string;
 }): string {
-  const { tailscaleAuthKey, hostname, volumeDevice, sshPublicKey } = params;
+  const {
+    tailscaleAuthKey,
+    hostname,
+    volumeDevice,
+    sshPublicKey,
+    anthropicTokens,
+    captureToken,
+    apiUrl,
+  } = params;
+
+  // Generate Claude credentials injection if user has tokens
+  const claudeCredsBlock = anthropicTokens
+    ? `
+  # Inject pre-existing Claude Code OAuth credentials
+  - mkdir -p /home/coder/.claude
+  - |
+    cat > /home/coder/.claude/.credentials.json << 'CLAUDE_CREDS_EOF'
+    {
+      "claudeAiOauth": {
+        "accessToken": "${anthropicTokens.accessToken}",
+        "refreshToken": "${anthropicTokens.refreshToken}",
+        "expiresAt": "${anthropicTokens.expiresAt}",
+        "scopes": ${JSON.stringify(anthropicTokens.scopes)}
+      }
+    }
+    CLAUDE_CREDS_EOF
+  - chmod 600 /home/coder/.claude/.credentials.json
+  - chown -R coder:coder /home/coder/.claude
+  `
+    : "";
+
+  // Generate capture token setup for new authentications
+  const captureTokenBlock =
+    captureToken && apiUrl
+      ? `
+  # Set up auth capture service for OAuth token capture
+  - echo '${captureToken}' > /var/run/ccc-capture-token
+  - chmod 600 /var/run/ccc-capture-token
+  - mkdir -p /etc/systemd/system/claude-auth-capture.service.d
+  - |
+    cat > /etc/systemd/system/claude-auth-capture.service.d/env.conf << 'CAPTURE_ENV_EOF'
+    [Service]
+    Environment=CCC_API_URL=${apiUrl}
+    CAPTURE_ENV_EOF
+  - systemctl daemon-reload
+  - systemctl start claude-auth-capture
+  `
+      : "";
 
   return `#cloud-config
 hostname: ${hostname}
@@ -70,7 +125,8 @@ runcmd:
   `
       : ""
   }
-
+${claudeCredsBlock}
+${captureTokenBlock}
   # Start ttyd terminal service
   - systemctl start ttyd
 
@@ -181,7 +237,19 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
     const volume = await hetzner.getVolume(volumeId);
     const volumeDevice = volume?.linux_device;
 
-    // Step 5: Create Hetzner server
+    // Step 5: Get user's Anthropic tokens (if they have any)
+    console.log(`[provision] Checking for existing Anthropic credentials`);
+    const anthropicTokens = await getTokensForUser(userId);
+    if (anthropicTokens) {
+      console.log(`[provision] User has existing Anthropic credentials, will inject`);
+    }
+
+    // Step 6: Generate capture token for new authentications
+    console.log(`[provision] Generating capture token for OAuth`);
+    const captureToken = await generateCaptureToken(userId, workspaceId);
+    const apiUrl = process.env["PUBLIC_API_URL"] || process.env["API_URL"];
+
+    // Step 7: Create Hetzner server
     console.log(`[provision] Creating Hetzner server`);
     const imageId = process.env["HETZNER_PACKER_IMAGE_ID"];
     if (!imageId) {
@@ -193,6 +261,9 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
       hostname,
       volumeDevice,
       sshPublicKey: process.env["SSH_PUBLIC_KEY"],
+      anthropicTokens: anthropicTokens || undefined,
+      captureToken,
+      apiUrl,
     });
 
     const serverResult = await hetzner.createServer({
