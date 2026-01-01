@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "sh -c 'cd apps/web && pnpm start'",
+    "startCommand": "sh -c 'cd apps/web && npm run start'",
     "restartPolicyType": "on_failure",
     "restartPolicyMaxRetries": 5
   }
