@@ -4,8 +4,6 @@ watchPatterns = ["apps/web/**", "packages/**", "nixpacks.toml", "turbo.json", "p
 
 [deploy]
 startCommand = "node /app/apps/web/server.js"
-healthcheckPath = "/api/config"
-healthcheckTimeout = 100
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
