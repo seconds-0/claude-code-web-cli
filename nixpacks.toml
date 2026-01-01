@@ -12,4 +12,4 @@ cmds = ["pnpm install --frozen-lockfile"]
 cmds = ["pnpm turbo run build --filter=@ccc/web"]
 
 [start]
-cmd = "node apps/web/.next/standalone/apps/web/server.js"
+cmd = "node ./apps/web/.next/standalone/apps/web/server.js"
