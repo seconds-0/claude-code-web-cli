@@ -43,13 +43,13 @@ COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
 # Create startup script that works with Railway's start command
-RUN echo '#!/bin/sh\nexec node /app/apps/web/server.js' > /app/apps/web/start.sh && \
+RUN printf '#!/bin/sh\nexec node /app/apps/web/server.js\n' > /app/apps/web/start.sh && \
     chmod +x /app/apps/web/start.sh && \
     # Also create a pnpm shim that runs our start script
-    echo '#!/bin/sh\nexec /app/apps/web/start.sh' > /usr/local/bin/pnpm && \
+    printf '#!/bin/sh\nexec /app/apps/web/start.sh\n' > /usr/local/bin/pnpm && \
     chmod +x /usr/local/bin/pnpm && \
     # Create cd shim to handle Railway's "cd apps/web && pnpm start" command
-    echo '#!/bin/sh\nexec /app/apps/web/start.sh' > /usr/local/bin/cd && \
+    printf '#!/bin/sh\nexec /app/apps/web/start.sh\n' > /usr/local/bin/cd && \
     chmod +x /usr/local/bin/cd
 
 ENV NODE_ENV=production
