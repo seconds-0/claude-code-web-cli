@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import Panel, { PanelContent } from "@/components/Panel";
-import { getApiUrl } from "@/lib/config";
+import { getApiUrl, fetchRuntimeConfig } from "@/lib/config";
 
 type SetupPhase = "creating" | "provisioning" | "connecting" | "ready" | "error";
 
@@ -51,6 +51,9 @@ export default function SetupPage() {
 
     async function setup() {
       try {
+        // Fetch runtime config first (for production URL)
+        await fetchRuntimeConfig();
+
         addLog("Initializing workspace...");
         const token = await getToken();
 

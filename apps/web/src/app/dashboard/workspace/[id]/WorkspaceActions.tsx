@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { getApiUrl } from "@/lib/config";
+import { getApiUrl, fetchRuntimeConfig } from "@/lib/config";
 
 interface WorkspaceActionsProps {
   workspaceId: string;
@@ -26,6 +26,9 @@ export default function WorkspaceActions({
     setIsLoading(action);
 
     try {
+      // Fetch runtime config first (for production URL)
+      await fetchRuntimeConfig();
+
       const token = await getToken();
 
       const res = await fetch(`${getApiUrl()}/api/v1/workspaces/${workspaceId}/${action}`, {

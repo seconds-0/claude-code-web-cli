@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
 import dynamic from "next/dynamic";
-import { getApiUrl } from "@/lib/config";
+import { getApiUrl, fetchRuntimeConfig } from "@/lib/config";
 
 // Dynamically import XTerminal to avoid SSR issues with xterm.js
 const XTerminal = dynamic(() => import("./XTerminal"), {
@@ -46,6 +46,9 @@ export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
     try {
       setIsLoading(true);
       setError(null);
+
+      // Fetch runtime config first (for production URL)
+      await fetchRuntimeConfig();
 
       // Get Clerk auth token
       const authToken = await getToken();
