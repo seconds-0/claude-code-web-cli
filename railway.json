@@ -5,7 +5,6 @@
     "dockerfilePath": "Dockerfile.web"
   },
   "deploy": {
-    "startCommand": "node /app/apps/web/server.js",
     "restartPolicyType": "on_failure",
     "restartPolicyMaxRetries": 5
   }
