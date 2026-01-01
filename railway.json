@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "node ./apps/web/.next/standalone/apps/web/server.js",
+    "startCommand": "cd apps/web && pnpm start",
     "restartPolicyType": "on_failure",
     "restartPolicyMaxRetries": 5
   }
