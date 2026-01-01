@@ -53,20 +53,21 @@ function generateCloudInit(params: {
   } = params;
 
   // Generate Claude credentials injection if user has tokens
+  // Use JSON.stringify to safely escape any special characters in tokens
+  const credentialsJson = anthropicTokens
+    ? JSON.stringify({ claudeAiOauth: anthropicTokens }, null, 2)
+    : "";
+
   const claudeCredsBlock = anthropicTokens
     ? `
   # Inject pre-existing Claude Code OAuth credentials
   - mkdir -p /home/coder/.claude
   - |
     cat > /home/coder/.claude/.credentials.json << 'CLAUDE_CREDS_EOF'
-    {
-      "claudeAiOauth": {
-        "accessToken": "${anthropicTokens.accessToken}",
-        "refreshToken": "${anthropicTokens.refreshToken}",
-        "expiresAt": "${anthropicTokens.expiresAt}",
-        "scopes": ${JSON.stringify(anthropicTokens.scopes)}
-      }
-    }
+${credentialsJson
+  .split("\n")
+  .map((line) => "    " + line)
+  .join("\n")}
     CLAUDE_CREDS_EOF
   - chmod 600 /home/coder/.claude/.credentials.json
   - chown -R coder:coder /home/coder/.claude
