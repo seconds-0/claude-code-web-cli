@@ -82,9 +82,37 @@ export const previews = pgTable("previews", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Anthropic OAuth credentials (encrypted at rest)
+// Stores Claude Code OAuth tokens for pre-authentication
+export const anthropicCredentials = pgTable("anthropic_credentials", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" })
+    .unique(), // One credential set per user
+  // Encrypted token blob containing accessToken, refreshToken, expiresAt, scopes
+  encryptedTokens: text("encrypted_tokens").notNull(),
+  // Initialization vector for AES-GCM decryption
+  encryptionIv: text("encryption_iv").notNull(),
+  // Token expiry for refresh scheduling (not encrypted - needed for queries)
+  expiresAt: timestamp("expires_at"),
+  // Status: valid, expired, revoked, error
+  status: text("status").notNull().default("valid"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
   workspaces: many(workspaces),
+  anthropicCredential: one(anthropicCredentials),
+}));
+
+export const anthropicCredentialsRelations = relations(anthropicCredentials, ({ one }) => ({
+  user: one(users, {
+    fields: [anthropicCredentials.userId],
+    references: [users.id],
+  }),
 }));
 
 export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
