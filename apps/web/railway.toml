@@ -1,6 +1,5 @@
+# Use auto-detected nixpacks from root
 [build]
-builder = "nixpacks"
-nixpacksConfigPath = "../../nixpacks.toml"
 watchPatterns = ["apps/web/**", "packages/**", "nixpacks.toml", "turbo.json", "package.json", "pnpm-lock.yaml"]
 
 [deploy]
