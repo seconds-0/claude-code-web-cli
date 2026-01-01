@@ -9,6 +9,9 @@ import WorkspaceStatusPoller from "@/components/WorkspaceStatusPoller";
 import PrivateModeToggle from "@/components/PrivateModeToggle";
 import { getApiUrl } from "@/lib/config";
 
+// Skip prerendering - requires auth at runtime
+export const dynamic = "force-dynamic";
+
 interface Workspace {
   id: string;
   name: string;

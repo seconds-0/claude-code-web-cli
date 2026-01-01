@@ -4,6 +4,9 @@ import Link from "next/link";
 import StatusBadge from "@/components/StatusBadge";
 import { getApiUrl } from "@/lib/config";
 
+// Skip prerendering - requires auth at runtime
+export const dynamic = "force-dynamic";
+
 interface Workspace {
   id: string;
   name: string;

@@ -1,0 +1,48 @@
+# Build stage
+FROM node:20-slim AS builder
+
+# Install pnpm
+RUN npm install -g pnpm@9.15.0
+
+WORKDIR /app
+
+# Copy package files for workspace
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/web/package.json ./apps/web/
+COPY packages/api-contract/package.json ./packages/api-contract/
+COPY packages/config/package.json ./packages/config/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY packages/ ./packages/
+COPY apps/web/ ./apps/web/
+COPY turbo.json ./
+
+# Build arguments for Next.js public env vars (baked in at build time)
+ARG NEXT_PUBLIC_CONTROL_PLANE_URL
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
+ENV NEXT_PUBLIC_CONTROL_PLANE_URL=$NEXT_PUBLIC_CONTROL_PLANE_URL
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
+# Build
+RUN pnpm turbo run build --filter=@ccc/web
+
+# Production stage
+FROM node:20-slim AS runner
+
+WORKDIR /app
+
+# Copy built artifacts
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+EXPOSE 3000
+
+CMD ["node", "apps/web/server.js"]
