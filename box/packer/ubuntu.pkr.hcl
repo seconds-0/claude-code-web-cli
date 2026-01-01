@@ -95,6 +95,22 @@ build {
     ]
   }
 
+  # Install Claude auth capture service (watches for OAuth completion)
+  provisioner "shell" {
+    script = "../scripts/install-claude-auth-capture.sh"
+    environment_vars = [
+      "DEBIAN_FRONTEND=noninteractive"
+    ]
+  }
+
+  # Install Claude wrapper with QR codes and better UX
+  provisioner "shell" {
+    script = "../scripts/install-claude-wrapper.sh"
+    environment_vars = [
+      "DEBIAN_FRONTEND=noninteractive"
+    ]
+  }
+
   # Install Caddy for direct connect mode (optional low-latency)
   provisioner "shell" {
     script = "../scripts/install-caddy.sh"
