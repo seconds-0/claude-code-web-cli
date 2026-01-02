@@ -23,6 +23,7 @@ import { getDb } from "../../db.js";
 import { workspaces, workspaceInstances } from "@ccc/db";
 import { createHetznerService } from "../../services/hetzner.js";
 import { createTailscaleService } from "../../services/tailscale.js";
+import { createCostService } from "../../services/costs.js";
 import type { DestroyJob } from "../queue.js";
 
 /**
@@ -58,6 +59,7 @@ export async function handleDestroyJob(job: DestroyJob): Promise<void> {
   // Initialize services
   const hetzner = createHetznerService();
   const tailscale = createTailscaleService();
+  const costs = createCostService(db);
 
   try {
     // Step 1: Update status to stopping
@@ -96,6 +98,16 @@ export async function handleDestroyJob(job: DestroyJob): Promise<void> {
           const deleteAction = await hetzner.deleteServer(serverIdNum);
           await hetzner.waitForAction(deleteAction.id);
           console.log(`[destroy] Server deleted`);
+
+          // Record server stop cost event
+          const serverType = process.env["HETZNER_SERVER_TYPE"] || "cpx11";
+          await costs.recordServerStop({
+            workspaceId,
+            userId,
+            serverId: String(serverIdNum),
+            serverType,
+          });
+          console.log(`[destroy] Recorded server stop cost event`);
         } else {
           console.log(`[destroy] Server ${serverId} not found, skipping`);
         }
