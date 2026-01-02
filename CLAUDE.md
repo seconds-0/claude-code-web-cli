@@ -14,11 +14,11 @@ Claude Code Cloud - a cloud development environment service with real terminal a
 ```
 Clients (Web, iOS, Android)
         ↓ HTTPS + WSS
-API + Realtime Gateway (Fly.io)
+Control Plane (Railway)
   - Auth (Clerk), REST API, Terminal relay, Preview relay, Voice token minting
-        ↓ Private overlay (Tailscale)
+        ↓ Public IP (primary) or Tailscale (optional)
 User Box (Hetzner)
-  - ttyd + tmux, Claude Code CLI, Persistent Volume at /mnt/workspace
+  - ttyd (0.0.0.0:7681) + tmux, Claude Code CLI, Persistent Volume at /mnt/workspace
         ↓
 Backup/Export (Cloudflare R2)
 ```
@@ -33,15 +33,15 @@ Backup/Export (Cloudflare R2)
 - **Cache/Locks:** Upstash Redis
 - **Auth:** Clerk (JWT/JWKS verification)
 - **Billing:** Stripe subscriptions + Billing Meters
-- **Hosting:** Fly.io (control plane), Railway (web)
+- **Hosting:** Railway (control plane), Vercel (web)
 
 ### Data Plane (User Compute)
 
 - **Compute:** Hetzner Cloud servers from Packer snapshots
 - **Persistence:** Hetzner Volumes (not S3 mounts - object storage is backup only)
-- **Terminal:** ttyd with `--writable` and `--url-arg` flags
+- **Terminal:** ttyd with `--writable` and `--url-arg` flags, bound to 0.0.0.0:7681
 - **Session Management:** tmux with `pipe-pane` for output capture
-- **Networking:** Tailscale private overlay (no public box ports)
+- **Networking:** Public IP (primary) for low-latency terminal relay; Tailscale installed for optional private network features
 
 ### Clients
 
@@ -66,10 +66,11 @@ Use `tmux pipe-pane` to capture pane output - do NOT rely on tmux `history-file`
 
 ### Security Model
 
-- Boxes have no public inbound exposure
-- All access through gateway over Tailscale
-- Short-lived session tokens
+- Terminal access (port 7681) relayed through control plane with session token validation
+- Control plane validates auth before proxying WebSocket to VM's public IP
+- Short-lived session tokens scoped to workspace
 - Encrypted stored secrets
+- Tailscale available for optional private network features
 
 ## Monorepo Structure
 
