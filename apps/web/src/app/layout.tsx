@@ -16,8 +16,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Claude Code Cloud",
-  description: "Your cloud dev machine with Claude Code, accessible anywhere.",
+  title: "untethered.computer",
+  description:
+    "Your computer, untethered. Instant cloud terminal, ready for Claude Code or any coding agent.",
 };
 
 export default function RootLayout({
