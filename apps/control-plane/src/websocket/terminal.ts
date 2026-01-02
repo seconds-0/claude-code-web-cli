@@ -165,12 +165,19 @@ async function handleConnection(clientWs: WebSocket, request: IncomingMessage): 
     return;
   }
 
-  // Use public IP for direct connection (Tailscale no longer required)
+  // Use public IP for direct connection, fallback to Tailscale IP for legacy workspaces
   const publicIp = workspace.instance.publicIp;
-  if (!publicIp) {
-    console.log(`[terminal] Connection ${connectionId} - no public IP`);
-    clientWs.close(4006, "Workspace has no public IP");
+  const tailscaleIp = workspace.instance.tailscaleIp;
+  const targetIp = publicIp || tailscaleIp;
+
+  if (!targetIp) {
+    console.log(`[terminal] Connection ${connectionId} - no IP address available`);
+    clientWs.close(4006, "Workspace has no IP address");
     return;
+  }
+
+  if (!publicIp && tailscaleIp) {
+    console.log(`[terminal] Connection ${connectionId} - using Tailscale IP (legacy fallback)`);
   }
 
   // Store connection info with flow control state
@@ -184,10 +191,10 @@ async function handleConnection(clientWs: WebSocket, request: IncomingMessage): 
     bufferSize: 0,
   });
 
-  // Connect to ttyd via public IP
+  // Connect to ttyd via public IP (or Tailscale fallback)
   try {
     const ttydWs = await connectToTtyd(
-      publicIp,
+      targetIp,
       // Forward ttyd messages to client with flow control
       (data) => {
         const conn = connections.get(connectionId);
