@@ -41,6 +41,8 @@ function generateCloudInit(params: {
   captureToken?: string;
   // API URL for token capture
   apiUrl?: string;
+  // Control plane IPs for firewall allowlist (space-separated)
+  controlPlaneIps?: string;
 }): string {
   const {
     tailscaleAuthKey,
@@ -50,6 +52,7 @@ function generateCloudInit(params: {
     anthropicTokens,
     captureToken,
     apiUrl,
+    controlPlaneIps,
   } = params;
 
   // Generate Claude credentials injection if user has tokens
@@ -92,6 +95,20 @@ ${credentialsJson
   `
       : "";
 
+  // Generate firewall configuration block if control plane IPs are provided
+  const firewallBlock = controlPlaneIps
+    ? `
+  # Configure ttyd firewall to restrict access to control plane only
+  - |
+    echo "Configuring ttyd firewall..."
+    export CONTROL_PLANE_IPS="${controlPlaneIps}"
+    /usr/local/bin/configure-ttyd-firewall.sh || echo "WARNING: Firewall configuration failed"
+  `
+    : `
+  # WARNING: CONTROL_PLANE_IPS not set - ttyd accessible from any IP
+  - echo "WARNING: ttyd port 7681 is accessible from any IP (CONTROL_PLANE_IPS not configured)"
+  `;
+
   return `#cloud-config
 hostname: ${hostname}
 
@@ -128,6 +145,7 @@ runcmd:
   }
 ${claudeCredsBlock}
 ${captureTokenBlock}
+${firewallBlock}
   # Start ttyd terminal service
   - systemctl start ttyd
 
@@ -257,6 +275,16 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
       throw new Error("HETZNER_PACKER_IMAGE_ID environment variable is required");
     }
 
+    // Security warning if CONTROL_PLANE_IPS is not configured
+    const controlPlaneIps = process.env["CONTROL_PLANE_IPS"];
+    if (!controlPlaneIps) {
+      console.warn(
+        `[provision] WARNING: CONTROL_PLANE_IPS not set - ttyd port 7681 will be open to any IP!`
+      );
+    } else {
+      console.log(`[provision] Firewall will restrict ttyd to: ${controlPlaneIps}`);
+    }
+
     const cloudInit = generateCloudInit({
       tailscaleAuthKey: authKey.key,
       hostname,
@@ -265,6 +293,7 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
       anthropicTokens: anthropicTokens || undefined,
       captureToken,
       apiUrl,
+      controlPlaneIps: process.env["CONTROL_PLANE_IPS"],
     });
 
     const serverResult = await hetzner.createServer({
