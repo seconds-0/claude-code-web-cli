@@ -33,7 +33,7 @@ Backup/Export (Cloudflare R2)
 - **Cache/Locks:** Upstash Redis
 - **Auth:** Clerk (JWT/JWKS verification)
 - **Billing:** Stripe subscriptions + Billing Meters
-- **Hosting:** Railway (control plane), Vercel (web)
+- **Hosting:** Railway (control plane and web)
 
 ### Data Plane (User Compute)
 

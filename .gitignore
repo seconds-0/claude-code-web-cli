@@ -40,6 +40,4 @@ pnpm-debug.log*
 *.tsbuildinfo
 
 # Misc
-.vercel/
 .netlify/
-.vercel
