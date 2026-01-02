@@ -473,114 +473,13 @@ workspacesRoute.post("/:id/session", async (c) => {
 });
 
 // GET /api/v1/workspaces/:id/direct-connect - Get direct connect URL for low-latency terminal
-// Returns a signed JWT and direct WebSocket URL to the VM's Caddy proxy
+// TEMPORARILY DISABLED: VMs don't have public inbound access (security model).
+// All terminal access goes through Tailscale relay.
+// TODO: Re-enable when Caddy proxy infrastructure is configured on VMs
 workspacesRoute.get("/:id/direct-connect", async (c) => {
-  const dbUserId = c.get("dbUserId");
-  const workspaceId = c.req.param("id");
-  const db = getDb();
-
-  // Verify workspace exists and belongs to user
-  const workspace = await db.query.workspaces.findFirst({
-    where: eq(workspaces.id, workspaceId),
-    with: { instance: true },
-  });
-
-  if (!workspace) {
-    return c.json({ error: "not_found", message: "Workspace not found" }, 404);
-  }
-
-  if (workspace.userId !== dbUserId) {
-    return c.json({ error: "forbidden", message: "Not authorized" }, 403);
-  }
-
-  // Check if workspace is running
-  if (workspace.instance?.status !== "running") {
-    return c.json({ error: "conflict", message: "Workspace is not running" }, 409);
-  }
-
-  // Check if private mode is enabled (Tailscale-only, no direct connect)
-  if (workspace.privateMode) {
-    return c.json({
-      available: false,
-      reason: "private_mode",
-      message:
-        "Direct connect is disabled. This workspace is in Private Mode (Tailscale-only networking).",
-      relayUrl: `/ws/terminal`,
-    });
-  }
-
-  // Check if workspace has direct connect enabled
-  // TODO: Add publicIp field to workspaceInstances schema and populate from Hetzner
-  // For now, we need to look up the public IP from Hetzner API using hetznerServerId
-  const hetznerServerId = workspace.instance.hetznerServerId;
-  if (!hetznerServerId) {
-    return c.json(
-      { error: "not_available", message: "Direct connect not available: no Hetzner server ID" },
-      400
-    );
-  }
-
-  // For MVP: Get public IP from Hetzner API
-  // In production, this should be cached in the database
-  let ipAddress: string | null = null;
-  try {
-    const hetznerToken = process.env["HETZNER_API_TOKEN"];
-    if (hetznerToken) {
-      const response = await fetch(`https://api.hetzner.cloud/v1/servers/${hetznerServerId}`, {
-        headers: { Authorization: `Bearer ${hetznerToken}` },
-      });
-      if (response.ok) {
-        const data = (await response.json()) as {
-          server?: { public_net?: { ipv4?: { ip?: string } } };
-        };
-        ipAddress = data.server?.public_net?.ipv4?.ip || null;
-      }
-    }
-  } catch (e) {
-    console.error("[direct-connect] Failed to get Hetzner server IP:", e);
-  }
-
-  if (!ipAddress) {
-    return c.json(
-      { error: "not_available", message: "Direct connect not available: could not get public IP" },
-      400
-    );
-  }
-
-  // Get client IP for JWT binding
-  const clientIp =
-    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
-    c.req.header("x-real-ip") ||
-    "unknown";
-
-  // Create signed JWT for Caddy validation
-  const { SignJWT } = await import("jose");
-  const secret = new TextEncoder().encode(
-    process.env["DIRECT_CONNECT_SECRET"] || "dev-secret-change-in-production"
-  );
-
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-
-  const token = await new SignJWT({
-    workspace_id: workspaceId,
-    user_id: dbUserId,
-    client_ip: clientIp,
-  })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime(expiresAt)
-    .setIssuer("claude-code-cloud")
-    .sign(secret);
-
-  // Build direct WebSocket URL
-  // Using nip.io for automatic DNS resolution of IP addresses
-  const directUrl = `wss://${ipAddress.replace(/\./g, "-")}.nip.io/ws?token=${encodeURIComponent(token)}`;
-
   return c.json({
-    available: true,
-    directUrl,
-    expiresAt: expiresAt.toISOString(),
-    // Also return fallback relay URL
-    relayUrl: `/ws/terminal`,
+    available: false,
+    reason: "disabled",
+    message: "Direct connect is temporarily disabled. Using secure relay connection.",
   });
 });
