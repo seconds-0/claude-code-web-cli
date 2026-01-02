@@ -28,6 +28,10 @@ app.use(
       if (origin && /^https:\/\/[\w-]+-[\w-]+\.vercel\.app$/.test(origin)) {
         return origin;
       }
+      // Allow Railway deployments (*.up.railway.app)
+      if (origin && /^https:\/\/[\w-]+\.up\.railway\.app$/.test(origin)) {
+        return origin;
+      }
       return null;
     },
     credentials: true,
