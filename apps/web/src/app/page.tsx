@@ -21,25 +21,27 @@ export default async function Home() {
           borderBottom: "1px solid var(--border)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <span
             style={{
               fontFamily: "var(--font-mono)",
               fontSize: "0.625rem",
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
+              textTransform: "lowercase",
+              letterSpacing: "0.02em",
               color: "var(--muted)",
             }}
           >
-            SYS.001
+            sys.001 @
           </span>
           <span
             style={{
-              fontWeight: 700,
-              letterSpacing: "-0.03em",
+              fontFamily: "var(--font-mono)",
+              fontWeight: 500,
+              fontSize: "1.125rem",
+              letterSpacing: "0.02em",
             }}
           >
-            Claude Code Cloud
+            untethered<span style={{ color: "var(--primary)" }}>.</span>computer
           </span>
         </div>
         <nav style={{ display: "flex", gap: "0.5rem" }}>
@@ -71,7 +73,7 @@ export default async function Home() {
             marginBottom: "1rem",
           }}
         >
-          PRODUCT.01 / CLOUD_DEV_ENVIRONMENT
+          PRODUCT.01 / CLOUD_TERMINAL
         </div>
 
         {/* Hero Title */}
@@ -85,7 +87,7 @@ export default async function Home() {
             maxWidth: "700px",
           }}
         >
-          Your cloud dev machine with Claude Code
+          Your computer, untethered
         </h1>
 
         <p
@@ -93,12 +95,12 @@ export default async function Home() {
             fontSize: "1.125rem",
             color: "var(--muted)",
             marginBottom: "2rem",
-            maxWidth: "500px",
+            maxWidth: "600px",
           }}
         >
-          Real terminal. Real filesystem. Real persistence.
+          Instant fully functional terminal, ready to run Claude Code
           <br />
-          Accessible anywhere. Voice-first.
+          or your coding agent of choice.
         </p>
 
         {/* CTA Buttons */}
@@ -164,8 +166,8 @@ export default async function Home() {
             />
             <FeatureCard
               label="FEAT.03"
-              title="Claude Code Built-in"
-              description="AI-powered development assistant ready to help you code."
+              title="Agent Ready"
+              description="Claude Code pre-installed. Or bring Cursor, Copilot, or your agent of choice."
             />
             <FeatureCard
               label="FEAT.04"
@@ -206,7 +208,7 @@ export default async function Home() {
             color: "var(--muted)",
           }}
         >
-          © CLAUDE CODE CLOUD
+          © UNTETHERED.COMPUTER
         </div>
       </footer>
     </main>
@@ -266,12 +268,12 @@ function FeatureCard({
 function TerminalDemo() {
   const lines = [
     { prompt: true, text: "claude --version" },
-    { prompt: false, text: "Claude Code v1.0.0" },
+    { prompt: false, text: "Claude Code v1.0.32" },
     { prompt: true, text: "claude" },
     { prompt: false, text: "" },
     { prompt: false, text: "╭──────────────────────────────────────────────╮" },
     { prompt: false, text: "│  Claude Code                                 │" },
-    { prompt: false, text: "│  Your AI-powered development assistant       │" },
+    { prompt: false, text: "│  Ready instantly. No setup required.         │" },
     { prompt: false, text: "╰──────────────────────────────────────────────╯" },
     { prompt: false, text: "" },
     { prompt: false, text: "> Help me build a REST API with authentication" },
