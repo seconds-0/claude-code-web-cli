@@ -51,6 +51,7 @@ export const workspaceInstances = pgTable(
       .references(() => workspaces.id, { onDelete: "cascade" }),
     hetznerServerId: text("hetzner_server_id"),
     tailscaleIp: text("tailscale_ip"),
+    publicIp: text("public_ip"),
     status: text("status").notNull().default("pending"), // pending, starting, running, stopping, stopped
     startedAt: timestamp("started_at"),
     stoppedAt: timestamp("stopped_at"),

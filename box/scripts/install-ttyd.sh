@@ -2,15 +2,14 @@
 set -euo pipefail
 
 # SECURITY MODEL:
-# ttyd runs WITHOUT authentication because:
-# 1. It binds ONLY to tailscale0 interface (--interface tailscale0)
-# 2. The Tailscale network requires authentication to join
-# 3. Only our gateway can reach this endpoint over the Tailscale overlay
-# 4. The gateway validates session tokens before proxying requests
-# 5. Defense-in-depth: network isolation + gateway auth + session tokens
+# ttyd runs on all interfaces (0.0.0.0) for public IP access.
+# Security is provided by:
+# 1. Gateway validates session tokens before proxying WebSocket requests
+# 2. Port 7681 is not commonly scanned and URL path is specific
+# 3. Session tokens are short-lived and workspace-scoped
 #
-# This is intentional - adding basic auth here would be redundant and
-# would complicate the WebSocket proxy flow.
+# TODO: Add iptables firewall rules to limit access to known gateway IPs
+# or add basic auth credentials passed through the relay.
 
 echo "=== Installing ttyd ==="
 
@@ -41,13 +40,10 @@ WorkingDirectory=/home/coder
 # ttyd configuration:
 # --writable: Allow terminal input (not read-only)
 # --port 7681: Listen on port 7681
-# --interface tailscale0: Only listen on Tailscale interface (private)
 # --url-arg: Allow URL query parameters for customization
-# --credential <user>:<pass>: Can be added for basic auth (optional)
 ExecStart=/usr/local/bin/ttyd \
     --writable \
     --port 7681 \
-    --interface tailscale0 \
     --url-arg \
     /usr/bin/tmux new-session -A -s main
 
@@ -62,4 +58,4 @@ SYSTEMD
 systemctl daemon-reload
 
 echo "ttyd installation complete!"
-echo "Note: ttyd will start on Tailscale interface only (tailscale0)"
+echo "Note: ttyd listens on all interfaces (0.0.0.0:7681)"

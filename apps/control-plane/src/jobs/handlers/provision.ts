@@ -289,10 +289,12 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
     hetznerServer = await hetzner.waitForServerStatus(hetznerServer.id, "running");
     console.log(`[provision] Server is running`);
 
-    // Update instance with Hetzner server ID
+    // Update instance with Hetzner server ID and public IP
+    const publicIp = hetznerServer.public_net.ipv4.ip;
+    console.log(`[provision] Server public IP: ${publicIp}`);
     await db
       .update(workspaceInstances)
-      .set({ hetznerServerId: String(hetznerServer.id) })
+      .set({ hetznerServerId: String(hetznerServer.id), publicIp })
       .where(eq(workspaceInstances.workspaceId, workspaceId));
 
     // Step 7: Wait for Tailscale device to appear
