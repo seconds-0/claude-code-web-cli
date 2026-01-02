@@ -1,8 +1,9 @@
 [build]
 builder = "dockerfile"
-dockerfilePath = "Dockerfile.control-plane"
+dockerfilePath = "../../Dockerfile"
 
 [deploy]
+startCommand = "./start.sh"
 healthcheckPath = "/api/v1/health"
 healthcheckTimeout = 100
 restartPolicyType = "on_failure"
