@@ -1,0 +1,1 @@
+ALTER TABLE "workspace_instances" ADD COLUMN "server_type" text;

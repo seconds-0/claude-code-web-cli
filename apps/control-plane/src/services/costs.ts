@@ -187,16 +187,17 @@ export class CostService {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     // Get active resources from workspace instances and volumes
+    // Only include volumes that are available/attached (not pending or deleted)
     const [instances, volumes] = await Promise.all([
       this.db.select().from(workspaceInstances).where(eq(workspaceInstances.status, "running")),
-      this.db.select().from(workspaceVolumes),
+      this.db.select().from(workspaceVolumes).where(eq(workspaceVolumes.status, "available")),
     ]);
 
-    // Calculate current hourly burn
+    // Calculate current hourly burn using actual server types
     let serverHourlyBurn = 0;
-    for (const _instance of instances) {
-      // Default to cpx11 if no server type recorded
-      serverHourlyBurn += DEFAULT_SERVER_RATE;
+    for (const instance of instances) {
+      const rate = SERVER_HOURLY_RATES[instance.serverType || "cpx11"] ?? DEFAULT_SERVER_RATE;
+      serverHourlyBurn += rate;
     }
 
     let volumeHourlyBurn = 0;
@@ -335,6 +336,11 @@ export class CostService {
   /**
    * Snapshot daily costs (run via cron/scheduled job)
    * Calculates costs from events and creates daily aggregates
+   *
+   * This method handles three cases:
+   * 1. Resources that started AND stopped within the day
+   * 2. Resources that started before the day and stopped during the day
+   * 3. Resources that were running for the entire day (started before, still running or stopped after)
    */
   async snapshotDailyCosts(date?: Date): Promise<void> {
     const targetDate = date || new Date();
@@ -342,14 +348,29 @@ export class CostService {
     const dayStart = new Date(dateStr);
     const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
-    // Get all events for the target day
-    const events = await this.db
+    // Step 1: Get ALL events before dayEnd to understand resource state
+    // We need events before dayStart to know what was running at day start
+    const allEvents = await this.db
       .select()
       .from(costEvents)
-      .where(and(gte(costEvents.timestamp, dayStart), lte(costEvents.timestamp, dayEnd)))
+      .where(lte(costEvents.timestamp, dayEnd))
       .orderBy(costEvents.timestamp);
 
-    // Group by workspace
+    // Build a map of resource state at dayStart and track what happens during the day
+    // Key: resourceType:resourceId -> latest start event info (or null if stopped)
+    const resourceState = new Map<
+      string,
+      {
+        startTimestamp: Date;
+        hourlyRate: number;
+        workspaceId: string | null;
+        userId: string | null;
+        resourceType: string;
+        sizeGb: number | null;
+      } | null
+    >();
+
+    // Track costs by workspace
     const workspaceCosts = new Map<
       string | null,
       {
@@ -361,84 +382,86 @@ export class CostService {
       }
     >();
 
-    // For ongoing calculations, we need to track what was running at day start
-    // This is a simplified version - a full implementation would query previous day's state
-    const resourceStarts = new Map<
-      string,
-      {
-        timestamp: Date;
-        hourlyRate: number;
-        workspaceId: string | null;
-        userId: string | null;
-        resourceType: string;
-        sizeGb: number | null;
-      }
-    >();
+    // Helper to add cost to a workspace
+    const addCost = (
+      workspaceId: string | null,
+      userId: string | null,
+      resourceType: string,
+      hours: number,
+      cost: number,
+      sizeGb: number | null
+    ) => {
+      const existing = workspaceCosts.get(workspaceId) || {
+        serverHours: 0,
+        serverCost: 0,
+        volumeGbHours: 0,
+        volumeCost: 0,
+        userId,
+      };
 
-    for (const event of events) {
+      if (resourceType === "server") {
+        existing.serverHours += hours;
+        existing.serverCost += cost;
+      } else {
+        existing.volumeGbHours += hours * (sizeGb || 0);
+        existing.volumeCost += cost;
+      }
+
+      workspaceCosts.set(workspaceId, existing);
+    };
+
+    // Process all events
+    for (const event of allEvents) {
       const key = `${event.resourceType}:${event.resourceId}`;
+      const eventTime = event.timestamp;
+      const hourlyRate = parseFloat(event.hourlyRate);
 
       if (event.eventType === "start" || event.eventType === "create") {
-        resourceStarts.set(key, {
-          timestamp: event.timestamp,
-          hourlyRate: parseFloat(event.hourlyRate),
+        // If this start is before dayStart, just track the state
+        // If it's during the day, it becomes the new start time for cost calculation
+        resourceState.set(key, {
+          startTimestamp: eventTime,
+          hourlyRate,
           workspaceId: event.workspaceId,
           userId: event.userId,
           resourceType: event.resourceType,
           sizeGb: event.sizeGb,
         });
       } else if (event.eventType === "stop" || event.eventType === "delete") {
-        const start = resourceStarts.get(key);
-        if (start) {
-          const hours = (event.timestamp.getTime() - start.timestamp.getTime()) / (1000 * 60 * 60);
-          const cost = hours * start.hourlyRate;
+        const state = resourceState.get(key);
 
-          const workspaceId = start.workspaceId;
-          const existing = workspaceCosts.get(workspaceId) || {
-            serverHours: 0,
-            serverCost: 0,
-            volumeGbHours: 0,
-            volumeCost: 0,
-            userId: start.userId,
-          };
+        if (state) {
+          // Calculate cost for this resource during the target day
+          // The billable period is: max(state.startTimestamp, dayStart) to min(eventTime, dayEnd)
+          const periodStart = new Date(
+            Math.max(state.startTimestamp.getTime(), dayStart.getTime())
+          );
+          const periodEnd = new Date(Math.min(eventTime.getTime(), dayEnd.getTime()));
 
-          if (start.resourceType === "server") {
-            existing.serverHours += hours;
-            existing.serverCost += cost;
-          } else {
-            existing.volumeGbHours += hours * (start.sizeGb || 0);
-            existing.volumeCost += cost;
+          if (periodStart < periodEnd) {
+            const hours = (periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60);
+            const cost = hours * state.hourlyRate;
+            addCost(state.workspaceId, state.userId, state.resourceType, hours, cost, state.sizeGb);
           }
-
-          workspaceCosts.set(workspaceId, existing);
-          resourceStarts.delete(key);
         }
+
+        // Resource is now stopped
+        resourceState.set(key, null);
       }
     }
 
     // Handle resources still running at end of day
-    for (const [, start] of resourceStarts) {
-      const hours = (dayEnd.getTime() - start.timestamp.getTime()) / (1000 * 60 * 60);
-      const cost = hours * start.hourlyRate;
+    for (const [, state] of resourceState) {
+      if (state) {
+        // Resource is still running - calculate cost from max(startTime, dayStart) to dayEnd
+        const periodStart = new Date(Math.max(state.startTimestamp.getTime(), dayStart.getTime()));
 
-      const workspaceId = start.workspaceId;
-      const existing = workspaceCosts.get(workspaceId) || {
-        serverHours: 0,
-        serverCost: 0,
-        volumeGbHours: 0,
-        volumeCost: 0,
-        userId: start.userId,
-      };
-
-      if (start.resourceType === "server") {
-        existing.serverHours += hours;
-        existing.serverCost += cost;
-      } else {
-        existing.volumeGbHours += hours * (start.sizeGb || 0);
-        existing.volumeCost += cost;
+        if (periodStart < dayEnd) {
+          const hours = (dayEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60);
+          const cost = hours * state.hourlyRate;
+          addCost(state.workspaceId, state.userId, state.resourceType, hours, cost, state.sizeGb);
+        }
       }
-
-      workspaceCosts.set(workspaceId, existing);
     }
 
     // Insert snapshots

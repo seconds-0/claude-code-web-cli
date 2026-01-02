@@ -329,16 +329,16 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
     hetznerServer = await hetzner.waitForServerStatus(hetznerServer.id, "running");
     console.log(`[provision] Server is running`);
 
-    // Update instance with Hetzner server ID and public IP
+    // Update instance with Hetzner server ID, public IP, and server type
     const publicIp = hetznerServer.public_net.ipv4.ip;
-    console.log(`[provision] Server public IP: ${publicIp}`);
+    const serverType = process.env["HETZNER_SERVER_TYPE"] || "cpx11";
+    console.log(`[provision] Server public IP: ${publicIp}, type: ${serverType}`);
     await db
       .update(workspaceInstances)
-      .set({ hetznerServerId: String(hetznerServer.id), publicIp })
+      .set({ hetznerServerId: String(hetznerServer.id), publicIp, serverType })
       .where(eq(workspaceInstances.workspaceId, workspaceId));
 
     // Record server start cost event
-    const serverType = process.env["HETZNER_SERVER_TYPE"] || "cpx11";
     await costs.recordServerStart({
       workspaceId,
       userId,

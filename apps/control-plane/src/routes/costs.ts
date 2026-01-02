@@ -2,16 +2,19 @@
  * Cost Tracking API Routes
  *
  * Admin endpoints for viewing Hetzner resource costs.
- * All endpoints require authentication.
+ * All endpoints require authentication + admin authorization.
  */
 
 import { Hono } from "hono";
+import { eq } from "drizzle-orm";
 import { getDb } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { createCostService } from "../services/costs.js";
+import { workspaces } from "@ccc/db";
 
 type Variables = {
   userId: string;
+  isAdmin: boolean;
 };
 
 export const costsRoute = new Hono<{ Variables: Variables }>();
@@ -20,10 +23,30 @@ export const costsRoute = new Hono<{ Variables: Variables }>();
 costsRoute.use("*", authMiddleware);
 
 /**
+ * Admin middleware - checks if user is in ADMIN_USER_IDS list
+ * Must be applied after authMiddleware
+ */
+async function adminMiddleware(c: Parameters<typeof authMiddleware>[0], next: () => Promise<void>) {
+  const clerkId = c.get("userId");
+  const adminIds = (process.env["ADMIN_USER_IDS"] || "").split(",").filter(Boolean);
+
+  // Check if the Clerk ID is in the admin list
+  const isAdmin = adminIds.includes(clerkId);
+  c.set("isAdmin", isAdmin);
+
+  if (!isAdmin) {
+    return c.json({ error: "forbidden", message: "Admin access required" }, 403);
+  }
+
+  return next();
+}
+
+/**
  * GET /api/v1/costs/current
  * Get current running costs and hourly burn rate
+ * Requires admin access
  */
-costsRoute.get("/current", async (c) => {
+costsRoute.get("/current", adminMiddleware, async (c) => {
   const db = getDb();
   const costs = createCostService(db);
 
@@ -47,8 +70,9 @@ costsRoute.get("/current", async (c) => {
  * GET /api/v1/costs/history
  * Get historical costs for a date range
  * Query params: start (YYYY-MM-DD), end (YYYY-MM-DD)
+ * Requires admin access
  */
-costsRoute.get("/history", async (c) => {
+costsRoute.get("/history", adminMiddleware, async (c) => {
   const db = getDb();
   const costs = createCostService(db);
 
@@ -95,11 +119,32 @@ costsRoute.get("/history", async (c) => {
 /**
  * GET /api/v1/costs/workspace/:id
  * Get costs for a specific workspace
+ * Admins can view any workspace, users can only view their own
  */
 costsRoute.get("/workspace/:id", async (c) => {
   const db = getDb();
   const costs = createCostService(db);
   const workspaceId = c.req.param("id");
+  const clerkId = c.get("userId");
+
+  // Get the workspace to check ownership
+  const workspace = await db.query.workspaces.findFirst({
+    where: eq(workspaces.id, workspaceId),
+    with: { user: true },
+  });
+
+  if (!workspace) {
+    return c.json({ error: "not_found", message: "Workspace not found" }, 404);
+  }
+
+  // Check authorization: admin or workspace owner
+  const adminIds = (process.env["ADMIN_USER_IDS"] || "").split(",").filter(Boolean);
+  const isAdmin = adminIds.includes(clerkId);
+  const isOwner = workspace.user.clerkId === clerkId;
+
+  if (!isAdmin && !isOwner) {
+    return c.json({ error: "forbidden", message: "Access denied" }, 403);
+  }
 
   const workspaceCosts = await costs.getWorkspaceCosts(workspaceId);
 
@@ -118,8 +163,9 @@ costsRoute.get("/workspace/:id", async (c) => {
  * GET /api/v1/costs/events
  * Get recent cost events (for debugging)
  * Query params: limit (default 50)
+ * Requires admin access
  */
-costsRoute.get("/events", async (c) => {
+costsRoute.get("/events", adminMiddleware, async (c) => {
   const db = getDb();
   const costs = createCostService(db);
   const limitParam = c.req.query("limit");
@@ -147,8 +193,9 @@ costsRoute.get("/events", async (c) => {
 /**
  * POST /api/v1/costs/snapshot
  * Trigger daily cost snapshot (for manual runs or cron)
+ * Requires admin access
  */
-costsRoute.post("/snapshot", async (c) => {
+costsRoute.post("/snapshot", adminMiddleware, async (c) => {
   const db = getDb();
   const costs = createCostService(db);
 
