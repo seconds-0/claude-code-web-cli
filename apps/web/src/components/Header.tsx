@@ -23,25 +23,27 @@ export default function Header() {
     >
       {/* Logo */}
       <Link href={isDashboard ? "/dashboard" : "/"}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <span
             style={{
               fontFamily: "var(--font-mono)",
               fontSize: "0.625rem",
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
+              textTransform: "lowercase",
+              letterSpacing: "0.02em",
               color: "var(--muted)",
             }}
           >
-            SYS.001
+            sys.001 @
           </span>
           <span
             style={{
-              fontWeight: 700,
-              letterSpacing: "-0.03em",
+              fontFamily: "var(--font-mono)",
+              fontWeight: 500,
+              fontSize: "1.125rem",
+              letterSpacing: "0.02em",
             }}
           >
-            Claude Code Cloud
+            untethered<span style={{ color: "var(--primary)" }}>.</span>computer
           </span>
         </div>
       </Link>
