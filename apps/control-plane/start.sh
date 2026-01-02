@@ -12,12 +12,15 @@ TAILSCALED_PID=$!
 sleep 2
 
 # Authenticate with Tailscale using auth key from environment
+# Note: Tailscale is optional - public IP relay is the primary method
 if [ -n "$TAILSCALE_AUTHKEY" ]; then
   echo "Authenticating with Tailscale..."
-  tailscale up --authkey="$TAILSCALE_AUTHKEY" --hostname="control-plane-railway"
-  echo "Tailscale authenticated successfully"
+  # Use unique hostname to avoid collisions when multiple replicas exist
+  HOSTNAME="control-plane-${RAILWAY_REPLICA_ID:-$(hostname)}"
+  tailscale up --authkey="$TAILSCALE_AUTHKEY" --hostname="$HOSTNAME"
+  echo "Tailscale authenticated successfully as $HOSTNAME"
 else
-  echo "WARNING: TAILSCALE_AUTHKEY not set - terminal relay will not work!"
+  echo "INFO: TAILSCALE_AUTHKEY not set - using public IP relay only"
 fi
 
 # Show Tailscale status

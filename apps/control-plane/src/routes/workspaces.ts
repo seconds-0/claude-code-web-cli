@@ -473,13 +473,13 @@ workspacesRoute.post("/:id/session", async (c) => {
 });
 
 // GET /api/v1/workspaces/:id/direct-connect - Get direct connect URL for low-latency terminal
-// TEMPORARILY DISABLED: VMs don't have public inbound access (security model).
-// All terminal access goes through Tailscale relay.
-// TODO: Re-enable when Caddy proxy infrastructure is configured on VMs
+// TEMPORARILY DISABLED: Direct browser-to-VM connections require additional proxy setup.
+// All terminal access goes through the control plane relay for security.
 workspacesRoute.get("/:id/direct-connect", async (c) => {
   return c.json({
     available: false,
     reason: "disabled",
     message: "Direct connect is temporarily disabled. Using secure relay connection.",
+    relayUrl: `/ws/terminal`, // Clients should use the relay endpoint
   });
 });
