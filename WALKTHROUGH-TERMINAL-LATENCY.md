@@ -195,7 +195,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 ### Before (High Latency)
 
 ```
-Browser → Fly.io Control Plane → Tailscale → Hetzner VM → ttyd
+Browser → Railway Control Plane → Tailscale → Hetzner VM → ttyd
           ↑ Extra hop (~150ms)   ↑ DERP relay possible (~200ms)
 ```
 
@@ -209,7 +209,7 @@ Browser → Caddy (on VM) → ttyd
 ### Private Mode (Maximum Security)
 
 ```
-Browser → Fly.io Control Plane → Tailscale → Hetzner VM → ttyd
+Browser → Railway Control Plane → Tailscale → Hetzner VM → ttyd
           ↑ Same as before, but user chose security over speed
 ```
 

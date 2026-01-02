@@ -21,15 +21,13 @@ app.use(
     origin: (origin) => {
       // Allow any localhost port for development
       if (origin && /^http:\/\/localhost:\d+$/.test(origin)) return origin;
-      // Allow specific Vercel preview/production URLs
-      // In production, set ALLOWED_ORIGINS env var
+      // Production: ALLOWED_ORIGINS should be set to your custom domain(s)
+      // This takes precedence and is the recommended approach for production
       const allowedOrigins = process.env["ALLOWED_ORIGINS"]?.split(",") ?? [];
-      if (allowedOrigins.includes(origin)) return origin;
-      // Allow Vercel preview deployments (validate pattern properly)
-      if (origin && /^https:\/\/[\w-]+-[\w-]+\.vercel\.app$/.test(origin)) {
-        return origin;
-      }
-      // Allow Railway deployments (*.up.railway.app)
+      if (origin && allowedOrigins.includes(origin)) return origin;
+      // Allow Railway preview deployments (*.up.railway.app)
+      // Note: This is permissive for development convenience. In production,
+      // set ALLOWED_ORIGINS to your specific domain(s) for tighter security.
       if (origin && /^https:\/\/[\w-]+\.up\.railway\.app$/.test(origin)) {
         return origin;
       }
