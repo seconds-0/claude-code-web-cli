@@ -176,8 +176,13 @@ async function handleConnection(clientWs: WebSocket, request: IncomingMessage): 
     return;
   }
 
-  if (!publicIp && tailscaleIp) {
-    console.log(`[terminal] Connection ${connectionId} - using Tailscale IP (legacy fallback)`);
+  // Log which connection method is being used (security audit trail)
+  if (publicIp) {
+    console.log(`[terminal] Connection ${connectionId} - using public IP: ${publicIp}`);
+  } else {
+    console.log(
+      `[terminal] Connection ${connectionId} - using Tailscale IP (legacy): ${tailscaleIp}`
+    );
   }
 
   // Store connection info with flow control state
