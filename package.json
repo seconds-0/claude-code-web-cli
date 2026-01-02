@@ -14,7 +14,11 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "clean": "turbo clean && rm -rf node_modules",
-    "prepare": "husky"
+    "prepare": "husky",
+    "costs": "node scripts/check-costs.mjs",
+    "costs:daily": "node scripts/check-costs.mjs --daily",
+    "costs:month": "node scripts/check-costs.mjs --month",
+    "costs:events": "node scripts/check-costs.mjs --events"
   },
   "devDependencies": {
     "next": "^15.1.3",

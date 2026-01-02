@@ -25,6 +25,7 @@ import { getDb } from "../../db.js";
 import { workspaces, workspaceVolumes, workspaceInstances } from "@ccc/db";
 import { createHetznerService, type HetznerServer } from "../../services/hetzner.js";
 import { createTailscaleService, type TailscaleDevice } from "../../services/tailscale.js";
+import { createCostService } from "../../services/costs.js";
 import type { ProvisionJob } from "../queue.js";
 import { generateCaptureToken, getTokensForUser } from "../../routes/anthropic.js";
 import type { TokenBlob } from "../../services/encryption.js";
@@ -192,6 +193,7 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
   // Initialize services
   const hetzner = createHetznerService();
   const tailscale = createTailscaleService();
+  const costs = createCostService(db);
 
   const hostname = generateHostname(workspaceId);
   let hetznerServer: HetznerServer | null = null;
@@ -247,6 +249,15 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
         .update(workspaceVolumes)
         .set({ hetznerVolumeId: String(volumeId), status: "available" })
         .where(eq(workspaceVolumes.workspaceId, workspaceId));
+
+      // Record volume cost event
+      await costs.recordVolumeCreate({
+        workspaceId,
+        userId,
+        volumeId: String(volumeId),
+        sizeGb: workspace.volume?.sizeGb || 20,
+      });
+      console.log(`[provision] Recorded volume create cost event`);
     } else {
       volumeId = parseInt(workspace.volume.hetznerVolumeId, 10);
       console.log(`[provision] Using existing Hetzner volume: ${volumeId}`);
@@ -318,13 +329,23 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
     hetznerServer = await hetzner.waitForServerStatus(hetznerServer.id, "running");
     console.log(`[provision] Server is running`);
 
-    // Update instance with Hetzner server ID and public IP
+    // Update instance with Hetzner server ID, public IP, and server type
     const publicIp = hetznerServer.public_net.ipv4.ip;
-    console.log(`[provision] Server public IP: ${publicIp}`);
+    const serverType = process.env["HETZNER_SERVER_TYPE"] || "cpx11";
+    console.log(`[provision] Server public IP: ${publicIp}, type: ${serverType}`);
     await db
       .update(workspaceInstances)
-      .set({ hetznerServerId: String(hetznerServer.id), publicIp })
+      .set({ hetznerServerId: String(hetznerServer.id), publicIp, serverType })
       .where(eq(workspaceInstances.workspaceId, workspaceId));
+
+    // Record server start cost event
+    await costs.recordServerStart({
+      workspaceId,
+      userId,
+      serverId: String(hetznerServer.id),
+      serverType,
+    });
+    console.log(`[provision] Recorded server start cost event`);
 
     // Step 7: Wait for Tailscale device to appear
     console.log(`[provision] Waiting for Tailscale device`);

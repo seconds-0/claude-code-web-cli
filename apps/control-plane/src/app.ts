@@ -7,6 +7,7 @@ import { meRoute } from "./routes/me.js";
 import { workspacesRoute } from "./routes/workspaces.js";
 import { usersRoute } from "./routes/users.js";
 import { anthropicRoute } from "./routes/anthropic.js";
+import { costsRoute } from "./routes/costs.js";
 
 // Create the main app
 export const app = new Hono();
@@ -44,6 +45,7 @@ app.route("/api/v1/me", meRoute);
 app.route("/api/v1/workspaces", workspacesRoute);
 app.route("/api/v1/users", usersRoute);
 app.route("/api/v1/anthropic", anthropicRoute);
+app.route("/api/v1/costs", costsRoute);
 
 // 404 handler
 app.notFound((c) => {

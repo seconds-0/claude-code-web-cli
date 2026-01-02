@@ -1,4 +1,15 @@
-import { pgTable, uuid, text, timestamp, integer, uniqueIndex, boolean } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  integer,
+  uniqueIndex,
+  boolean,
+  numeric,
+  date,
+  index,
+} from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // Users table
@@ -50,6 +61,7 @@ export const workspaceInstances = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     hetznerServerId: text("hetzner_server_id"),
+    serverType: text("server_type"), // cpx11, cpx21, etc. - persisted for accurate cost tracking
     tailscaleIp: text("tailscale_ip"),
     publicIp: text("public_ip"),
     status: text("status").notNull().default("pending"), // pending, starting, running, stopping, stopped
@@ -103,10 +115,58 @@ export const anthropicCredentials = pgTable("anthropic_credentials", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Cost tracking events (event sourcing for Hetzner resource usage)
+export const costEvents = pgTable(
+  "cost_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "set null" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    resourceType: text("resource_type").notNull(), // 'server' | 'volume'
+    resourceId: text("resource_id").notNull(), // hetzner server/volume ID
+    serverType: text("server_type"), // cpx11, cpx21, etc. (for servers)
+    sizeGb: integer("size_gb"), // for volumes
+    eventType: text("event_type").notNull(), // 'start' | 'stop' | 'create' | 'delete'
+    hourlyRate: numeric("hourly_rate", { precision: 10, scale: 6 }).notNull(), // cost per hour in EUR
+    timestamp: timestamp("timestamp").defaultNow().notNull(),
+  },
+  (table) => [
+    index("cost_events_workspace_id_idx").on(table.workspaceId),
+    index("cost_events_user_id_idx").on(table.userId),
+    index("cost_events_timestamp_idx").on(table.timestamp),
+    index("cost_events_resource_idx").on(table.resourceType, table.resourceId),
+  ]
+);
+
+// Cost snapshots (daily aggregates for historical reporting)
+export const costSnapshots = pgTable(
+  "cost_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    date: date("date").notNull(),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "set null" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    serverHours: numeric("server_hours", { precision: 10, scale: 4 }).default("0"),
+    serverCost: numeric("server_cost", { precision: 10, scale: 4 }).default("0"),
+    volumeGbHours: numeric("volume_gb_hours", { precision: 10, scale: 4 }).default("0"),
+    volumeCost: numeric("volume_cost", { precision: 10, scale: 4 }).default("0"),
+    totalCost: numeric("total_cost", { precision: 10, scale: 4 }).default("0"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("cost_snapshots_date_idx").on(table.date),
+    index("cost_snapshots_workspace_id_idx").on(table.workspaceId),
+    index("cost_snapshots_user_id_idx").on(table.userId),
+    uniqueIndex("cost_snapshots_date_workspace_idx").on(table.date, table.workspaceId),
+  ]
+);
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   workspaces: many(workspaces),
   anthropicCredential: one(anthropicCredentials),
+  costEvents: many(costEvents),
+  costSnapshots: many(costSnapshots),
 }));
 
 export const anthropicCredentialsRelations = relations(anthropicCredentials, ({ one }) => ({
@@ -121,6 +181,8 @@ export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
   volume: one(workspaceVolumes),
   instance: one(workspaceInstances),
   sessions: many(sessions),
+  costEvents: many(costEvents),
+  costSnapshots: many(costSnapshots),
 }));
 
 export const workspaceVolumesRelations = relations(workspaceVolumes, ({ one }) => ({
@@ -144,4 +206,26 @@ export const sessionsRelations = relations(sessions, ({ one, many }) => ({
 
 export const previewsRelations = relations(previews, ({ one }) => ({
   session: one(sessions, { fields: [previews.sessionId], references: [sessions.id] }),
+}));
+
+export const costEventsRelations = relations(costEvents, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [costEvents.workspaceId],
+    references: [workspaces.id],
+  }),
+  user: one(users, {
+    fields: [costEvents.userId],
+    references: [users.id],
+  }),
+}));
+
+export const costSnapshotsRelations = relations(costSnapshots, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [costSnapshots.workspaceId],
+    references: [workspaces.id],
+  }),
+  user: one(users, {
+    fields: [costSnapshots.userId],
+    references: [users.id],
+  }),
 }));
