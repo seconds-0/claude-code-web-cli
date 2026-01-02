@@ -25,6 +25,7 @@ import { getDb } from "../../db.js";
 import { workspaces, workspaceVolumes, workspaceInstances } from "@ccc/db";
 import { createHetznerService, type HetznerServer } from "../../services/hetzner.js";
 import { createTailscaleService, type TailscaleDevice } from "../../services/tailscale.js";
+import { createCostService } from "../../services/costs.js";
 import type { ProvisionJob } from "../queue.js";
 import { generateCaptureToken, getTokensForUser } from "../../routes/anthropic.js";
 import type { TokenBlob } from "../../services/encryption.js";
@@ -41,6 +42,8 @@ function generateCloudInit(params: {
   captureToken?: string;
   // API URL for token capture
   apiUrl?: string;
+  // Control plane IPs for firewall allowlist (space-separated)
+  controlPlaneIps?: string;
 }): string {
   const {
     tailscaleAuthKey,
@@ -50,6 +53,7 @@ function generateCloudInit(params: {
     anthropicTokens,
     captureToken,
     apiUrl,
+    controlPlaneIps,
   } = params;
 
   // Generate Claude credentials injection if user has tokens
@@ -92,6 +96,20 @@ ${credentialsJson
   `
       : "";
 
+  // Generate firewall configuration block if control plane IPs are provided
+  const firewallBlock = controlPlaneIps
+    ? `
+  # Configure ttyd firewall to restrict access to control plane only
+  - |
+    echo "Configuring ttyd firewall..."
+    export CONTROL_PLANE_IPS="${controlPlaneIps}"
+    /usr/local/bin/configure-ttyd-firewall.sh || echo "WARNING: Firewall configuration failed"
+  `
+    : `
+  # WARNING: CONTROL_PLANE_IPS not set - ttyd accessible from any IP
+  - echo "WARNING: ttyd port 7681 is accessible from any IP (CONTROL_PLANE_IPS not configured)"
+  `;
+
   return `#cloud-config
 hostname: ${hostname}
 
@@ -128,6 +146,7 @@ runcmd:
   }
 ${claudeCredsBlock}
 ${captureTokenBlock}
+${firewallBlock}
   # Start ttyd terminal service
   - systemctl start ttyd
 
@@ -174,6 +193,7 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
   // Initialize services
   const hetzner = createHetznerService();
   const tailscale = createTailscaleService();
+  const costs = createCostService(db);
 
   const hostname = generateHostname(workspaceId);
   let hetznerServer: HetznerServer | null = null;
@@ -229,6 +249,15 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
         .update(workspaceVolumes)
         .set({ hetznerVolumeId: String(volumeId), status: "available" })
         .where(eq(workspaceVolumes.workspaceId, workspaceId));
+
+      // Record volume cost event
+      await costs.recordVolumeCreate({
+        workspaceId,
+        userId,
+        volumeId: String(volumeId),
+        sizeGb: workspace.volume?.sizeGb || 20,
+      });
+      console.log(`[provision] Recorded volume create cost event`);
     } else {
       volumeId = parseInt(workspace.volume.hetznerVolumeId, 10);
       console.log(`[provision] Using existing Hetzner volume: ${volumeId}`);
@@ -257,6 +286,16 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
       throw new Error("HETZNER_PACKER_IMAGE_ID environment variable is required");
     }
 
+    // Security warning if CONTROL_PLANE_IPS is not configured
+    const controlPlaneIps = process.env["CONTROL_PLANE_IPS"];
+    if (!controlPlaneIps) {
+      console.warn(
+        `[provision] WARNING: CONTROL_PLANE_IPS not set - ttyd port 7681 will be open to any IP!`
+      );
+    } else {
+      console.log(`[provision] Firewall will restrict ttyd to: ${controlPlaneIps}`);
+    }
+
     const cloudInit = generateCloudInit({
       tailscaleAuthKey: authKey.key,
       hostname,
@@ -265,6 +304,7 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
       anthropicTokens: anthropicTokens || undefined,
       captureToken,
       apiUrl,
+      controlPlaneIps: process.env["CONTROL_PLANE_IPS"],
     });
 
     const serverResult = await hetzner.createServer({
@@ -289,11 +329,23 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
     hetznerServer = await hetzner.waitForServerStatus(hetznerServer.id, "running");
     console.log(`[provision] Server is running`);
 
-    // Update instance with Hetzner server ID
+    // Update instance with Hetzner server ID, public IP, and server type
+    const publicIp = hetznerServer.public_net.ipv4.ip;
+    const serverType = process.env["HETZNER_SERVER_TYPE"] || "cpx11";
+    console.log(`[provision] Server public IP: ${publicIp}, type: ${serverType}`);
     await db
       .update(workspaceInstances)
-      .set({ hetznerServerId: String(hetznerServer.id) })
+      .set({ hetznerServerId: String(hetznerServer.id), publicIp, serverType })
       .where(eq(workspaceInstances.workspaceId, workspaceId));
+
+    // Record server start cost event
+    await costs.recordServerStart({
+      workspaceId,
+      userId,
+      serverId: String(hetznerServer.id),
+      serverType,
+    });
+    console.log(`[provision] Recorded server start cost event`);
 
     // Step 7: Wait for Tailscale device to appear
     console.log(`[provision] Waiting for Tailscale device`);

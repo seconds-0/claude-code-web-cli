@@ -22,6 +22,27 @@
       "when": 1767242103151,
       "tag": "0002_curvy_zarda",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1767317154656,
+      "tag": "0003_motionless_kid_colt",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1767372861682,
+      "tag": "0004_premium_wraith",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1767384058730,
+      "tag": "0005_lazy_meltdown",
+      "breakpoints": true
     }
   ]
 }

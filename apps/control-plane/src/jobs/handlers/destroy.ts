@@ -23,6 +23,7 @@ import { getDb } from "../../db.js";
 import { workspaces, workspaceInstances } from "@ccc/db";
 import { createHetznerService } from "../../services/hetzner.js";
 import { createTailscaleService } from "../../services/tailscale.js";
+import { createCostService } from "../../services/costs.js";
 import type { DestroyJob } from "../queue.js";
 
 /**
@@ -58,6 +59,7 @@ export async function handleDestroyJob(job: DestroyJob): Promise<void> {
   // Initialize services
   const hetzner = createHetznerService();
   const tailscale = createTailscaleService();
+  const costs = createCostService(db);
 
   try {
     // Step 1: Update status to stopping
@@ -96,6 +98,17 @@ export async function handleDestroyJob(job: DestroyJob): Promise<void> {
           const deleteAction = await hetzner.deleteServer(serverIdNum);
           await hetzner.waitForAction(deleteAction.id);
           console.log(`[destroy] Server deleted`);
+
+          // Record server stop cost event - use serverType from DB, fallback to env
+          const serverType =
+            workspace.instance?.serverType || process.env["HETZNER_SERVER_TYPE"] || "cpx11";
+          await costs.recordServerStop({
+            workspaceId,
+            userId,
+            serverId: String(serverIdNum),
+            serverType,
+          });
+          console.log(`[destroy] Recorded server stop cost event (type: ${serverType})`);
         } else {
           console.log(`[destroy] Server ${serverId} not found, skipping`);
         }
@@ -118,7 +131,35 @@ export async function handleDestroyJob(job: DestroyJob): Promise<void> {
       }
     }
 
-    // Step 5: Update database or delete if requested
+    // Step 5: Delete volume if full deletion is requested
+    if (job.deleteAfterDestroy && workspace.volume?.hetznerVolumeId) {
+      try {
+        const volumeId = parseInt(workspace.volume.hetznerVolumeId, 10);
+        console.log(`[destroy] Deleting Hetzner volume ${volumeId}`);
+        const volume = await hetzner.getVolume(volumeId);
+
+        if (volume) {
+          await hetzner.deleteVolume(volumeId);
+          console.log(`[destroy] Volume deleted`);
+
+          // Record volume delete cost event
+          await costs.recordVolumeDelete({
+            workspaceId,
+            userId,
+            volumeId: String(volumeId),
+            sizeGb: workspace.volume.sizeGb || 50,
+          });
+          console.log(`[destroy] Recorded volume delete cost event`);
+        } else {
+          console.log(`[destroy] Volume ${volumeId} not found, skipping`);
+        }
+      } catch (error) {
+        console.warn(`[destroy] Failed to delete volume:`, error);
+        // Continue even if volume deletion fails
+      }
+    }
+
+    // Step 6: Update database or delete if requested
     if (job.deleteAfterDestroy) {
       // Full deletion requested - remove from database
       console.log(`[destroy] Deleting workspace ${workspaceId} from database`);

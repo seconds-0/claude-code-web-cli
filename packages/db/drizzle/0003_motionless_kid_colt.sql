@@ -1,0 +1,1 @@
+ALTER TABLE "workspace_instances" ADD COLUMN "public_ip" text;

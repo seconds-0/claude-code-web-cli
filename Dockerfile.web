@@ -1,8 +1,8 @@
 # Build stage
 FROM node:20-slim AS builder
 
-# Install pnpm
-RUN npm install -g pnpm@9.15.0
+# Enable pnpm via corepack (built into Node.js 16+, more memory-efficient)
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
 WORKDIR /app
 
@@ -43,8 +43,11 @@ COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
 ENV NODE_ENV=production
-ENV PORT=3000
+# Let Railway set PORT; set HOSTNAME to bind all interfaces
+ENV HOSTNAME=0.0.0.0
 
+# Default port for local testing only
 EXPOSE 3000
 
-CMD ["node", "apps/web/server.js"]
+# Standalone preserves monorepo structure, server.js is at apps/web/
+CMD ["node", "/app/apps/web/server.js"]

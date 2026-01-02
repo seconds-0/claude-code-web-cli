@@ -29,6 +29,14 @@ FROM node:20-slim AS runner
 
 WORKDIR /app
 
+# Install Tailscale for connecting to VMs over private network
+RUN apt-get update && apt-get install -y curl ca-certificates iptables && \
+    curl -fsSL https://tailscale.com/install.sh | sh && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Create directory for Tailscale state
+RUN mkdir -p /var/lib/tailscale
+
 # Copy built artifacts and dependencies
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/control-plane/node_modules ./apps/control-plane/node_modules
@@ -36,9 +44,14 @@ COPY --from=builder /app/apps/control-plane/dist ./apps/control-plane/dist
 COPY --from=builder /app/apps/control-plane/package.json ./apps/control-plane/
 COPY --from=builder /app/packages ./packages
 
+# Copy startup script
+COPY apps/control-plane/start.sh ./start.sh
+RUN chmod +x ./start.sh
+
 ENV NODE_ENV=production
 ENV PORT=3001
 
 EXPOSE 3001
 
-CMD ["node", "apps/control-plane/dist/index.js"]
+# Use startup script that initializes Tailscale before starting the app
+CMD ["./start.sh"]
