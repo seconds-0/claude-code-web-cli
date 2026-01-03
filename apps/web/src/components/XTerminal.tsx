@@ -23,9 +23,8 @@ type ConnectionState = "connecting" | "connected" | "disconnected" | "error";
 const HIGH_WATERMARK = 500_000; // 500KB - pause when exceeded
 const LOW_WATERMARK = 50_000; // 50KB - resume when below
 
-// Local echo constants - reduces perceived latency
-const LOCAL_ECHO_TIMEOUT_MS = 1000; // Clear prediction if server doesn't confirm within this time
-const PRINTABLE_CHAR_REGEX = /^[\x20-\x7E]$/; // ASCII printable characters (space to tilde)
+// Local echo disabled - direct connect mode is fast enough (~50ms)
+// and the reconciliation logic has edge cases that cause double-input
 
 // Debounce utility
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
@@ -57,11 +56,6 @@ export default function XTerminal({
   // Flow control state (refs to avoid re-renders on every byte)
   const pendingDataRef = useRef(0);
   const isPausedRef = useRef(false);
-
-  // Local echo state - optimistic keystroke prediction
-  const pendingEchoRef = useRef<string>(""); // Characters we've echoed locally but not confirmed
-  const localEchoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const localEchoEnabledRef = useRef(true); // Can be disabled for full-screen apps
 
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const reconnectAttemptRef = useRef(0); // Use ref to avoid triggering effect re-runs
@@ -159,33 +153,7 @@ export default function XTerminal({
         if (msgType === 48) {
           // '0' = Output message - write to terminal with flow control
           const decoder = new TextDecoder();
-          let text = decoder.decode(payload);
-
-          // Detect full-screen app mode (alternate screen buffer)
-          // ESC[?1049h = enter alternate screen, ESC[?1049l = exit
-          if (text.includes("\x1b[?1049h") || text.includes("\x1b[?47h")) {
-            localEchoEnabledRef.current = false;
-            pendingEchoRef.current = ""; // Clear predictions when entering full-screen
-          } else if (text.includes("\x1b[?1049l") || text.includes("\x1b[?47l")) {
-            localEchoEnabledRef.current = true;
-          }
-
-          // Strip characters we've already echoed locally (optimistic echo reconciliation)
-          if (pendingEchoRef.current.length > 0) {
-            let stripped = 0;
-            for (let i = 0; i < text.length && i < pendingEchoRef.current.length; i++) {
-              if (text[i] === pendingEchoRef.current[i]) {
-                stripped++;
-              } else {
-                break; // Mismatch - stop stripping
-              }
-            }
-            if (stripped > 0) {
-              text = text.slice(stripped);
-              pendingEchoRef.current = pendingEchoRef.current.slice(stripped);
-            }
-          }
-
+          const text = decoder.decode(payload);
           if (text.length > 0) {
             writeWithFlowControl(text, text.length);
           }
@@ -396,30 +364,8 @@ export default function XTerminal({
       // Handle terminal input - ttyd expects '0' + data as text string
       term.onData((data) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-          // Optimistic local echo for printable characters (reduces perceived latency)
-          // Only echo if: single printable char, local echo enabled, and not a control sequence
-          const isPrintable = data.length === 1 && PRINTABLE_CHAR_REGEX.test(data);
-          const isControlSequence = data.charCodeAt(0) < 32 || data.charCodeAt(0) === 127;
-
-          if (isPrintable && localEchoEnabledRef.current && !isControlSequence && term) {
-            // Echo immediately to terminal
-            term.write(data);
-            pendingEchoRef.current += data;
-
-            // Set timeout to clear prediction if server doesn't confirm
-            if (localEchoTimeoutRef.current) {
-              clearTimeout(localEchoTimeoutRef.current);
-            }
-            localEchoTimeoutRef.current = setTimeout(() => {
-              // If predictions haven't been cleared, something went wrong
-              // Clear them to avoid state desync
-              if (pendingEchoRef.current.length > 0) {
-                console.warn("[XTerminal] Local echo timeout - clearing predictions");
-                pendingEchoRef.current = "";
-              }
-            }, LOCAL_ECHO_TIMEOUT_MS);
-          }
-
+          // Local echo disabled - direct connect mode is fast enough (~50ms)
+          // and the reconciliation logic has edge cases that cause double-input
           // ttyd input protocol: '0' prefix + data as text
           wsRef.current.send("0" + data);
         }
@@ -456,11 +402,6 @@ export default function XTerminal({
       // Cleanup reconnect timeout
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
-      }
-
-      // Cleanup local echo timeout
-      if (localEchoTimeoutRef.current) {
-        clearTimeout(localEchoTimeoutRef.current);
       }
 
       // Close WebSocket
