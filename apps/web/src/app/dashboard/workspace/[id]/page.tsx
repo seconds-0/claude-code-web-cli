@@ -7,6 +7,7 @@ import StatusBadge from "@/components/StatusBadge";
 import { PanelStat } from "@/components/Panel";
 import WorkspaceStatusPoller from "@/components/WorkspaceStatusPoller";
 import PrivateModeToggle from "@/components/PrivateModeToggle";
+import MobileContextBar from "@/components/MobileContextBar";
 import { getApiUrl } from "@/lib/config";
 
 // Skip prerendering - requires auth at runtime
@@ -93,122 +94,41 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
   const isTerminalReady = workspace.instance?.status === "running";
 
   return (
-    <div style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
-      {/* Status poller for automatic updates during provisioning */}
-      <WorkspaceStatusPoller
-        workspaceStatus={workspace.status}
-        instanceStatus={workspace.instance?.status}
-      />
+    <>
+      {/* Mobile Context Bar - replaces header on mobile */}
+      <MobileContextBar workspaceName={workspace.name} isConnected={isTerminalReady} />
 
-      {/* Breadcrumb */}
-      <div style={{ marginBottom: "1.5rem" }}>
-        <Link
-          href="/dashboard"
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: "0.75rem",
-            color: "var(--muted)",
-          }}
-        >
-          ← WORKSPACES
-        </Link>
-      </div>
+      <div style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
+        {/* Status poller for automatic updates during provisioning */}
+        <WorkspaceStatusPoller
+          workspaceStatus={workspace.status}
+          instanceStatus={workspace.instance?.status}
+        />
 
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: "2rem",
-        }}
-      >
-        <div>
-          <div
+        {/* Breadcrumb */}
+        <div style={{ marginBottom: "1.5rem" }} className="desktop-only">
+          <Link
+            href="/dashboard"
             style={{
               fontFamily: "var(--font-mono)",
-              fontSize: "0.625rem",
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
+              fontSize: "0.75rem",
               color: "var(--muted)",
-              marginBottom: "0.5rem",
             }}
           >
-            WS.{workspace.id.slice(0, 8).toUpperCase()} / CONTROL_PANEL
-          </div>
-          <h1
-            style={{
-              fontSize: "1.75rem",
-              fontWeight: 700,
-              letterSpacing: "-0.03em",
-              marginBottom: "0.75rem",
-            }}
-          >
-            {workspace.name}
-          </h1>
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-            <StatusBadge status={workspace.status} />
-            {workspace.instance && (
-              <StatusBadge
-                status={workspace.instance.status}
-                label={`VM:${workspace.instance.status}`}
-              />
-            )}
-          </div>
+            ← WORKSPACES
+          </Link>
         </div>
 
-        <WorkspaceActions
-          workspaceId={workspace.id}
-          canStart={canStart}
-          canStop={canStop}
-          canSuspend={canSuspend}
-        />
-      </div>
-
-      {/* Terminal Section */}
-      <TerminalSection
-        workspaceId={workspace.id}
-        workspaceName={workspace.name}
-        ipAddress={workspace.instance?.ipAddress}
-        isReady={isTerminalReady}
-      />
-
-      {/* Info Grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: "1px",
-          background: "var(--border)",
-          border: "1px solid var(--border)",
-        }}
-      >
-        <div style={{ background: "var(--surface)" }}>
-          <PanelStat
-            label="STORAGE"
-            value={`${workspace.volume?.sizeGb || 20} GB`}
-            subValue={workspace.volume?.status || "pending"}
-          />
-        </div>
-
-        <div style={{ background: "var(--surface)" }}>
-          <PanelStat
-            label="CREATED"
-            value={new Date(workspace.createdAt).toLocaleDateString()}
-            subValue={new Date(workspace.createdAt).toLocaleTimeString()}
-          />
-        </div>
-
-        <div style={{ background: "var(--surface)" }}>
-          <PanelStat
-            label="LAST_UPDATED"
-            value={new Date(workspace.updatedAt).toLocaleDateString()}
-            subValue={new Date(workspace.updatedAt).toLocaleTimeString()}
-          />
-        </div>
-
-        <div style={{ background: "var(--surface)" }}>
-          <div style={{ padding: "1rem" }}>
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: "2rem",
+          }}
+        >
+          <div>
             <div
               style={{
                 fontFamily: "var(--font-mono)",
@@ -219,55 +139,141 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
                 marginBottom: "0.5rem",
               }}
             >
-              WORKSPACE_ID
+              WS.{workspace.id.slice(0, 8).toUpperCase()} / CONTROL_PANEL
             </div>
-            <div
+            <h1
               style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "0.75rem",
-                wordBreak: "break-all",
-                color: "var(--foreground)",
+                fontSize: "1.75rem",
+                fontWeight: 700,
+                letterSpacing: "-0.03em",
+                marginBottom: "0.75rem",
               }}
             >
-              {workspace.id}
+              {workspace.name}
+            </h1>
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+              <StatusBadge status={workspace.status} />
+              {workspace.instance && (
+                <StatusBadge
+                  status={workspace.instance.status}
+                  label={`VM:${workspace.instance.status}`}
+                />
+              )}
+            </div>
+          </div>
+
+          <WorkspaceActions
+            workspaceId={workspace.id}
+            canStart={canStart}
+            canStop={canStop}
+            canSuspend={canSuspend}
+          />
+        </div>
+
+        {/* Terminal Section */}
+        <TerminalSection
+          workspaceId={workspace.id}
+          workspaceName={workspace.name}
+          ipAddress={workspace.instance?.ipAddress}
+          isReady={isTerminalReady}
+        />
+
+        {/* Info Grid */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "1px",
+            background: "var(--border)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <div style={{ background: "var(--surface)" }}>
+            <PanelStat
+              label="STORAGE"
+              value={`${workspace.volume?.sizeGb || 20} GB`}
+              subValue={workspace.volume?.status || "pending"}
+            />
+          </div>
+
+          <div style={{ background: "var(--surface)" }}>
+            <PanelStat
+              label="CREATED"
+              value={new Date(workspace.createdAt).toLocaleDateString()}
+              subValue={new Date(workspace.createdAt).toLocaleTimeString()}
+            />
+          </div>
+
+          <div style={{ background: "var(--surface)" }}>
+            <PanelStat
+              label="LAST_UPDATED"
+              value={new Date(workspace.updatedAt).toLocaleDateString()}
+              subValue={new Date(workspace.updatedAt).toLocaleTimeString()}
+            />
+          </div>
+
+          <div style={{ background: "var(--surface)" }}>
+            <div style={{ padding: "1rem" }}>
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "0.625rem",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  color: "var(--muted)",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                WORKSPACE_ID
+              </div>
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "0.75rem",
+                  wordBreak: "break-all",
+                  color: "var(--foreground)",
+                }}
+              >
+                {workspace.id}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Settings Section */}
-      <div style={{ marginTop: "2rem" }}>
+        {/* Settings Section */}
+        <div style={{ marginTop: "2rem" }}>
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "0.625rem",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              color: "var(--muted)",
+              marginBottom: "0.75rem",
+            }}
+          >
+            SETTINGS
+          </div>
+          <PrivateModeToggle workspaceId={workspace.id} initialValue={workspace.privateMode} />
+        </div>
+
+        {/* Footer */}
         <div
           style={{
+            marginTop: "2rem",
+            display: "flex",
+            justifyContent: "space-between",
             fontFamily: "var(--font-mono)",
             fontSize: "0.625rem",
             textTransform: "uppercase",
             letterSpacing: "0.1em",
             color: "var(--muted)",
-            marginBottom: "0.75rem",
           }}
         >
-          SETTINGS
+          <span>IP: {workspace.instance?.ipAddress || "NOT_ASSIGNED"}</span>
+          <span>INSTANCE: {workspace.instance?.id?.slice(0, 8) || "NONE"}</span>
         </div>
-        <PrivateModeToggle workspaceId={workspace.id} initialValue={workspace.privateMode} />
       </div>
-
-      {/* Footer */}
-      <div
-        style={{
-          marginTop: "2rem",
-          display: "flex",
-          justifyContent: "space-between",
-          fontFamily: "var(--font-mono)",
-          fontSize: "0.625rem",
-          textTransform: "uppercase",
-          letterSpacing: "0.1em",
-          color: "var(--muted)",
-        }}
-      >
-        <span>IP: {workspace.instance?.ipAddress || "NOT_ASSIGNED"}</span>
-        <span>INSTANCE: {workspace.instance?.id?.slice(0, 8) || "NONE"}</span>
-      </div>
-    </div>
+    </>
   );
 }
