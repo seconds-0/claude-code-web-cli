@@ -532,3 +532,39 @@ button.latched,
 .workspace-card:hover {
   background: var(--surface-hover);
 }
+
+/* ========== RESPONSIVE UTILITIES ========== */
+.desktop-only {
+  display: block;
+}
+
+.mobile-only {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .desktop-only {
+    display: none !important;
+  }
+
+  .mobile-only {
+    display: block !important;
+  }
+}
+
+/* ========== MOBILE IMMERSIVE MODE ========== */
+/* Hide header on workspace pages on mobile */
+@media (max-width: 768px) {
+  body.workspace-page .header {
+    display: none !important;
+  }
+
+  body.workspace-page main {
+    padding-top: 0;
+  }
+
+  /* Reduce padding on workspace page for mobile */
+  body.workspace-page [style*="padding: 2rem"] {
+    padding: 0.75rem !important;
+  }
+}
