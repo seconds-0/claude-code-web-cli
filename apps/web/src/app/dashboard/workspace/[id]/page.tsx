@@ -52,14 +52,14 @@ async function getWorkspace(id: string, token: string): Promise<Workspace | null
 
     const data = await res.json();
     // API returns workspace, volume, instance as separate properties
-    // Map tailscaleIp to ipAddress for UI compatibility
+    // Use publicIp for direct connect mode, fallback to tailscaleIp for private mode
     return {
       ...data.workspace,
       volume: data.volume || undefined,
       instance: data.instance
         ? {
             ...data.instance,
-            ipAddress: data.instance.tailscaleIp,
+            ipAddress: data.instance.publicIp || data.instance.tailscaleIp,
           }
         : undefined,
     };

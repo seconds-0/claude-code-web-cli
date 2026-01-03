@@ -177,6 +177,7 @@ workspacesRoute.post("/", async (c) => {
       id: instance.id,
       workspaceId: instance.workspaceId,
       hetznerServerId: instance.hetznerServerId,
+      publicIp: instance.publicIp,
       tailscaleIp: instance.tailscaleIp,
       status: instanceStatus as "pending" | "starting" | "running" | "stopping" | "stopped",
       startedAt: instance.startedAt?.toISOString() ?? null,
@@ -237,6 +238,7 @@ workspacesRoute.get("/:id", async (c) => {
           id: workspace.instance.id,
           workspaceId: workspace.instance.workspaceId,
           hetznerServerId: workspace.instance.hetznerServerId,
+          publicIp: workspace.instance.publicIp,
           tailscaleIp: workspace.instance.tailscaleIp,
           status: workspace.instance.status as
             | "pending"
