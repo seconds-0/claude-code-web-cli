@@ -34,6 +34,18 @@ const connections = new Map<
 // ttyd WebSocket port
 const TTYD_PORT = 7681;
 
+// Retry configuration for ttyd connection
+// Exported for testing
+export const TTYD_RETRY_ATTEMPTS = 3;
+export const TTYD_RETRY_DELAY_MS = 2000;
+
+/**
+ * Sleep utility for retry delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Parse query parameters from URL
  */
@@ -97,6 +109,44 @@ async function connectToTtyd(
       reject(error);
     });
   });
+}
+
+/**
+ * Connect to ttyd with retry logic
+ * Retries on connection failure to handle slow ttyd startup
+ * Exported for testing
+ */
+export async function connectToTtydWithRetry(
+  targetIp: string,
+  onMessage: (data: Buffer) => void,
+  onClose: () => void,
+  onError: (error: Error) => void,
+  connectionId: string
+): Promise<WebSocket> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= TTYD_RETRY_ATTEMPTS; attempt++) {
+    try {
+      console.log(
+        `[terminal] Connection ${connectionId} - ttyd attempt ${attempt}/${TTYD_RETRY_ATTEMPTS}`
+      );
+      return await connectToTtyd(targetIp, onMessage, onClose, onError);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.log(
+        `[terminal] Connection ${connectionId} - ttyd attempt ${attempt} failed: ${lastError.message}`
+      );
+
+      if (attempt < TTYD_RETRY_ATTEMPTS) {
+        console.log(
+          `[terminal] Connection ${connectionId} - retrying in ${TTYD_RETRY_DELAY_MS}ms...`
+        );
+        await sleep(TTYD_RETRY_DELAY_MS);
+      }
+    }
+  }
+
+  throw lastError || new Error("Failed to connect to ttyd after retries");
 }
 
 /**
@@ -191,9 +241,9 @@ async function handleConnection(clientWs: WebSocket, request: IncomingMessage): 
     bufferSize: 0,
   });
 
-  // Connect to ttyd via public IP (or Tailscale fallback)
+  // Connect to ttyd via public IP (or Tailscale fallback) with retry logic
   try {
-    const ttydWs = await connectToTtyd(
+    const ttydWs = await connectToTtydWithRetry(
       targetIp,
       // Forward ttyd messages to client with flow control
       (data) => {
@@ -234,7 +284,8 @@ async function handleConnection(clientWs: WebSocket, request: IncomingMessage): 
           clientWs.close(1011, "Terminal connection error");
         }
         connections.delete(connectionId);
-      }
+      },
+      connectionId
     );
 
     // Update connection with ttyd WebSocket

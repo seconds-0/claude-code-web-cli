@@ -31,7 +31,8 @@ import { generateCaptureToken, getTokensForUser } from "../../routes/anthropic.j
 import type { TokenBlob } from "../../services/encryption.js";
 
 // Cloud-init template for user boxes
-function generateCloudInit(params: {
+// Exported for testing
+export function generateCloudInit(params: {
   tailscaleAuthKey: string;
   hostname: string;
   volumeDevice?: string;
@@ -44,6 +45,8 @@ function generateCloudInit(params: {
   apiUrl?: string;
   // Control plane IPs for firewall allowlist (space-separated)
   controlPlaneIps?: string;
+  // Private mode - if false, direct connect is used and Tailscale wait is optional
+  privateMode?: boolean;
 }): string {
   const {
     tailscaleAuthKey,
@@ -54,6 +57,7 @@ function generateCloudInit(params: {
     captureToken,
     apiUrl,
     controlPlaneIps,
+    privateMode = false,
   } = params;
 
   // Generate Claude credentials injection if user has tokens
@@ -97,13 +101,21 @@ ${credentialsJson
       : "";
 
   // Generate firewall configuration block if control plane IPs are provided
+  // Uses inline iptables rules instead of external script for reliability
   const firewallBlock = controlPlaneIps
     ? `
   # Configure ttyd firewall to restrict access to control plane only
   - |
-    echo "Configuring ttyd firewall..."
-    export CONTROL_PLANE_IPS="${controlPlaneIps}"
-    /usr/local/bin/configure-ttyd-firewall.sh || echo "WARNING: Firewall configuration failed"
+    echo "Configuring ttyd firewall with inline iptables..."
+    # Drop all traffic to ttyd port by default
+    iptables -A INPUT -p tcp --dport 7681 -j DROP
+    # Allow traffic from specified control plane IPs
+    for ip in ${controlPlaneIps}; do
+      iptables -I INPUT -p tcp --dport 7681 -s "$ip" -j ACCEPT
+      echo "Allowed ttyd access from $ip"
+    done
+    # Also allow localhost for debugging
+    iptables -I INPUT -p tcp --dport 7681 -s 127.0.0.1 -j ACCEPT
   `
     : `
   # WARNING: CONTROL_PLANE_IPS not set - ttyd accessible from any IP
@@ -128,11 +140,19 @@ users:
     : ""
 }
 runcmd:
-  # Connect to Tailscale
+  # Connect to Tailscale (non-blocking in direct connect mode)
+  ${
+    privateMode
+      ? `
   - tailscale up --authkey=${tailscaleAuthKey} --hostname=${hostname}
-
-  # Wait for Tailscale interface to be ready (ttyd binds to tailscale0)
+  # Wait for Tailscale interface in private mode (required for connectivity)
   - for i in $(seq 1 30); do tailscale status && break || sleep 2; done
+  `
+      : `
+  # Direct connect mode: start Tailscale but don't wait - we have public IP
+  - tailscale up --authkey=${tailscaleAuthKey} --hostname=${hostname} || echo "Tailscale optional in direct mode"
+  `
+  }
 
   # Mount persistent volume if attached
   ${
@@ -146,9 +166,30 @@ runcmd:
   }
 ${claudeCredsBlock}
 ${captureTokenBlock}
+  # Wait for network interface to be ready before starting ttyd
+  - |
+    echo "Waiting for network interface..."
+    for i in $(seq 1 30); do
+      if ip addr show | grep -q 'scope global'; then
+        echo "Network interface ready"
+        break
+      fi
+      sleep 1
+    done
 ${firewallBlock}
   # Start ttyd terminal service
   - systemctl start ttyd
+
+  # Verify ttyd is running
+  - |
+    sleep 2
+    if systemctl is-active --quiet ttyd; then
+      echo "ttyd started successfully"
+    else
+      echo "ttyd failed to start, checking status..."
+      systemctl status ttyd || true
+      journalctl -u ttyd --no-pager -n 20 || true
+    fi
 
   # Signal that provisioning is complete
   - touch /var/run/ccc-provisioned
@@ -305,6 +346,7 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
       captureToken,
       apiUrl,
       controlPlaneIps: process.env["CONTROL_PLANE_IPS"],
+      privateMode: workspace.privateMode,
     });
 
     const serverResult = await hetzner.createServer({
