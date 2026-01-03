@@ -30,7 +30,9 @@ echo "Creating ttyd systemd service..."
 cat > /etc/systemd/system/ttyd.service << 'SYSTEMD'
 [Unit]
 Description=ttyd - Share terminal over HTTP
-After=network.target tailscaled.service
+# Only depend on network - tailscale is optional for direct connect mode
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -50,50 +52,27 @@ ExecStart=/usr/local/bin/ttyd \
 Restart=on-failure
 RestartSec=5
 
+# Ensure service starts even if startup is slow
+TimeoutStartSec=30
+
 [Install]
 WantedBy=multi-user.target
 SYSTEMD
 
-# Reload systemd but don't enable yet (cloud-init will start it)
+# Reload and enable ttyd to start on boot
+# This ensures ttyd runs even if cloud-init fails
 systemctl daemon-reload
+systemctl enable ttyd
 
 # ============================================
 # SECURITY: Firewall rules for ttyd
 # ============================================
-# Restrict port 7681 to only accept connections from control plane IPs.
-# The control plane relays terminal connections - direct access is not allowed.
-#
-# CONTROL_PLANE_IPS should be set in the provisioning environment.
-# Multiple IPs can be specified as a space-separated list.
+# Firewall rules are now configured at runtime via cloud-init.
+# The control plane sets CONTROL_PLANE_IPS and configures iptables
+# when the workspace is provisioned. This allows dynamic IP configuration.
 # ============================================
-
-echo "Configuring iptables firewall rules for ttyd..."
-
-# Control plane IPs (Railway static egress IPs)
-# These should be updated if Railway infrastructure changes
-CONTROL_PLANE_IPS="${CONTROL_PLANE_IPS:-}"
-
-if [ -n "$CONTROL_PLANE_IPS" ]; then
-  for IP in $CONTROL_PLANE_IPS; do
-    echo "Allowing ttyd access from control plane IP: $IP"
-    iptables -A INPUT -p tcp --dport 7681 -s "$IP" -j ACCEPT
-  done
-
-  # Drop all other connections to ttyd port
-  iptables -A INPUT -p tcp --dport 7681 -j DROP
-
-  # Persist iptables rules
-  if command -v iptables-save >/dev/null 2>&1; then
-    mkdir -p /etc/iptables
-    iptables-save > /etc/iptables/rules.v4
-    echo "iptables rules saved to /etc/iptables/rules.v4"
-  fi
-
-  echo "ttyd firewall rules configured successfully"
-else
-  echo "WARNING: CONTROL_PLANE_IPS not set - ttyd accessible from any IP!"
-  echo "Set CONTROL_PLANE_IPS environment variable during provisioning."
-fi
 
 echo "ttyd installation complete!"
 echo "Note: ttyd listens on all interfaces (0.0.0.0:7681)"
+echo "Note: ttyd is enabled to start on boot"
+echo "Note: Firewall rules will be configured at runtime via cloud-init"
