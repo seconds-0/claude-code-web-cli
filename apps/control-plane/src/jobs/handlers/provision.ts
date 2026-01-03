@@ -347,15 +347,27 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
     });
     console.log(`[provision] Recorded server start cost event`);
 
-    // Step 7: Wait for Tailscale device to appear
-    console.log(`[provision] Waiting for Tailscale device`);
-    tailscaleDevice = await tailscale.waitForDevice(hostname, {
-      timeoutMs: 180_000, // 3 minutes
-      pollIntervalMs: 5000,
-    });
-
-    const tailscaleIp = tailscale.getDeviceIp(tailscaleDevice);
-    console.log(`[provision] Tailscale device connected: ${tailscaleDevice.id} (${tailscaleIp})`);
+    // Step 7: Wait for Tailscale device (optional for direct connect mode)
+    // If we have a public IP, we can use direct connect and Tailscale is not required
+    let tailscaleIp: string | null = null;
+    console.log(`[provision] Waiting for Tailscale device (optional, have public IP: ${publicIp})`);
+    try {
+      tailscaleDevice = await tailscale.waitForDevice(hostname, {
+        timeoutMs: publicIp ? 60_000 : 180_000, // Shorter timeout if we have direct connect
+        pollIntervalMs: 5000,
+      });
+      tailscaleIp = tailscale.getDeviceIp(tailscaleDevice);
+      console.log(`[provision] Tailscale device connected: ${tailscaleDevice.id} (${tailscaleIp})`);
+    } catch (tailscaleError) {
+      if (publicIp) {
+        console.warn(
+          `[provision] Tailscale device did not appear, but direct connect available via ${publicIp}`
+        );
+      } else {
+        // No public IP and no Tailscale - this is a real failure
+        throw tailscaleError;
+      }
+    }
 
     // Step 8: Update database with final state
     await db
@@ -371,7 +383,9 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
       .set({ status: "ready", updatedAt: new Date() })
       .where(eq(workspaces.id, workspaceId));
 
-    console.log(`[provision] Workspace ${workspaceId} provisioned successfully`);
+    console.log(
+      `[provision] Workspace ${workspaceId} provisioned successfully (direct: ${!!publicIp}, tailscale: ${!!tailscaleIp})`
+    );
   } catch (error) {
     console.error(`[provision] Error provisioning workspace ${workspaceId}:`, error);
 
@@ -392,9 +406,11 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
         console.log(`[provision] Cleaning up server ${hetznerServer.id}`);
         await hetzner.deleteServer(hetznerServer.id);
       }
-      if (tailscaleDevice) {
-        console.log(`[provision] Cleaning up Tailscale device ${tailscaleDevice.id}`);
-        await tailscale.deleteDevice(tailscaleDevice.id);
+      // Use type assertion to help TypeScript understand tailscaleDevice may have been assigned
+      const deviceToCleanup = tailscaleDevice as TailscaleDevice | null;
+      if (deviceToCleanup) {
+        console.log(`[provision] Cleaning up Tailscale device ${deviceToCleanup.id}`);
+        await tailscale.deleteDevice(deviceToCleanup.id);
       }
     } catch (cleanupError) {
       console.error(`[provision] Error during cleanup:`, cleanupError);
