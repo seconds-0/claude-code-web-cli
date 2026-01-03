@@ -164,6 +164,7 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
 
           <WorkspaceActions
             workspaceId={workspace.id}
+            workspaceName={workspace.name}
             canStart={canStart}
             canStop={canStop}
             canSuspend={canSuspend}
