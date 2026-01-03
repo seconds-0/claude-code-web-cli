@@ -11,7 +11,9 @@
  */
 
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { eq, and, lt, lte } from "drizzle-orm";
+import { Receiver } from "@upstash/qstash";
 import {
   workspaceInstances,
   workspaceVolumes,
@@ -27,17 +29,30 @@ import { createSubscriptionService } from "../services/subscription.js";
 const QSTASH_CURRENT_SIGNING_KEY = process.env["QSTASH_CURRENT_SIGNING_KEY"];
 const QSTASH_NEXT_SIGNING_KEY = process.env["QSTASH_NEXT_SIGNING_KEY"];
 
+// Initialize QStash Receiver for signature verification
+const qstashReceiver =
+  QSTASH_CURRENT_SIGNING_KEY || QSTASH_NEXT_SIGNING_KEY
+    ? new Receiver({
+        currentSigningKey: QSTASH_CURRENT_SIGNING_KEY || "",
+        nextSigningKey: QSTASH_NEXT_SIGNING_KEY || "",
+      })
+    : null;
+
 export const billingJobsRoute = new Hono();
 
 /**
- * Verify QStash signature (simplified - production should use @upstash/qstash SDK)
+ * Verify QStash signature using the official SDK Receiver
  */
-function verifyQStashSignature(c: {
-  req: { header: (name: string) => string | undefined };
-}): boolean {
+async function verifyQStashSignature(c: Context): Promise<boolean> {
   // In development, allow unauthenticated requests
   if (process.env["NODE_ENV"] === "development") {
     return true;
+  }
+
+  // If QStash is not configured, reject all requests
+  if (!qstashReceiver) {
+    console.warn("QStash signing keys not configured - rejecting request");
+    return false;
   }
 
   // Check for QStash signature header
@@ -46,9 +61,22 @@ function verifyQStashSignature(c: {
     return false;
   }
 
-  // TODO: Implement proper signature verification using @upstash/qstash Receiver
-  // For now, just check that the keys are configured
-  return !!(QSTASH_CURRENT_SIGNING_KEY || QSTASH_NEXT_SIGNING_KEY);
+  try {
+    // Get raw request body for signature verification
+    const body = await c.req.text();
+
+    // Verify the signature using the QStash Receiver
+    const isValid = await qstashReceiver.verify({
+      signature,
+      body,
+      clockTolerance: 60, // Allow 60 seconds clock difference
+    });
+
+    return isValid;
+  } catch (error) {
+    console.error("QStash signature verification failed:", error);
+    return false;
+  }
 }
 
 /**
@@ -58,7 +86,7 @@ function verifyQStashSignature(c: {
  * Should be called every minute by QStash.
  */
 billingJobsRoute.post("/record-compute-usage", async (c) => {
-  if (!verifyQStashSignature(c)) {
+  if (!(await verifyQStashSignature(c))) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
@@ -135,7 +163,7 @@ billingJobsRoute.post("/record-compute-usage", async (c) => {
  * Should be called every hour by QStash.
  */
 billingJobsRoute.post("/record-storage-usage", async (c) => {
-  if (!verifyQStashSignature(c)) {
+  if (!(await verifyQStashSignature(c))) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
@@ -167,10 +195,18 @@ billingJobsRoute.post("/record-storage-usage", async (c) => {
       continue;
     }
 
+    // Skip volumes without valid size (don't default to 50GB as that could overcharge)
+    if (!volume.sizeGb || volume.sizeGb <= 0) {
+      console.warn(`Volume ${volume.volumeId} has invalid sizeGb: ${volume.sizeGb}, skipping`);
+      skipped++;
+      continue;
+    }
+
     const wasRecorded = await usageService.recordStorageGbHour({
       userId: volume.userId,
       workspaceId: volume.workspaceId,
-      sizeGb: volume.sizeGb || 50,
+      volumeId: volume.volumeId,
+      sizeGb: volume.sizeGb,
       billingPeriodStart: volume.periodStart,
       billingPeriodEnd: volume.periodEnd,
     });
@@ -213,7 +249,7 @@ billingJobsRoute.post("/record-storage-usage", async (c) => {
  * Should be called every minute by QStash.
  */
 billingJobsRoute.post("/sync-meter-events", async (c) => {
-  if (!verifyQStashSignature(c)) {
+  if (!(await verifyQStashSignature(c))) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
@@ -235,7 +271,7 @@ billingJobsRoute.post("/sync-meter-events", async (c) => {
  * Should be called daily at midnight by QStash.
  */
 billingJobsRoute.post("/reset-free-periods", async (c) => {
-  if (!verifyQStashSignature(c)) {
+  if (!(await verifyQStashSignature(c))) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
@@ -271,7 +307,7 @@ billingJobsRoute.post("/reset-free-periods", async (c) => {
  * Should be called daily by QStash.
  */
 billingJobsRoute.post("/cleanup-expired-webhooks", async (c) => {
-  if (!verifyQStashSignature(c)) {
+  if (!(await verifyQStashSignature(c))) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 

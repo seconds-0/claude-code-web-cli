@@ -114,15 +114,16 @@ export class UsageService {
   async recordStorageGbHour(params: {
     userId: string;
     workspaceId: string;
+    volumeId: string;
     sizeGb: number;
     billingPeriodStart: Date;
     billingPeriodEnd: Date;
     timestamp?: Date;
   }): Promise<boolean> {
     const ts = params.timestamp || new Date();
-    // Idempotency key: one event per workspace per hour
+    // Idempotency key: one event per volume per hour (supports multiple volumes per workspace)
     const hourKey = Math.floor(ts.getTime() / 3600000);
-    const idempotencyKey = `storage:${params.workspaceId}:${hourKey}`;
+    const idempotencyKey = `storage:${params.volumeId}:${hourKey}`;
 
     return this.recordUsage({
       userId: params.userId,

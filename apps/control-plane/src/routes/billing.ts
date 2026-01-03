@@ -23,6 +23,43 @@ export const billingRoute = new Hono<{ Variables: Variables }>();
 // Apply auth middleware to all routes
 billingRoute.use("*", authMiddleware);
 
+// Allowed redirect URL hosts (prevent open redirects)
+const ALLOWED_REDIRECT_HOSTS = new Set([
+  process.env["WEB_APP_URL"] ? new URL(process.env["WEB_APP_URL"]).host : "localhost:3000",
+  "localhost:3000",
+  "localhost:3001",
+]);
+
+/**
+ * Validate a redirect URL to prevent open redirect attacks
+ */
+function isValidRedirectUrl(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+    // Only allow https in production, http in development
+    if (process.env["NODE_ENV"] === "production" && url.protocol !== "https:") {
+      return false;
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return false;
+    }
+    return ALLOWED_REDIRECT_HOSTS.has(url.host);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Safe JSON parsing helper
+ */
+async function safeJsonParse<T>(c: { req: { json: () => Promise<unknown> } }): Promise<T | null> {
+  try {
+    return (await c.req.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * GET /billing/subscription
  *
@@ -177,10 +214,22 @@ billingRoute.post("/checkout", async (c) => {
   const clerkId = c.get("userId");
   const db = getDb();
 
-  const body = await c.req.json<{ plan: string; successUrl: string; cancelUrl: string }>();
+  const body = await safeJsonParse<{ plan: string; successUrl: string; cancelUrl: string }>(c);
+
+  if (!body) {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
 
   if (!body.plan || !body.successUrl || !body.cancelUrl) {
     return c.json({ error: "Missing required fields: plan, successUrl, cancelUrl" }, 400);
+  }
+
+  // Validate redirect URLs to prevent open redirect attacks
+  if (!isValidRedirectUrl(body.successUrl)) {
+    return c.json({ error: "Invalid successUrl: must be a valid URL on allowed domain" }, 400);
+  }
+  if (!isValidRedirectUrl(body.cancelUrl)) {
+    return c.json({ error: "Invalid cancelUrl: must be a valid URL on allowed domain" }, 400);
   }
 
   const [user] = await db.select().from(users).where(eq(users.clerkId, clerkId)).limit(1);
@@ -219,10 +268,19 @@ billingRoute.post("/portal", async (c) => {
   const clerkId = c.get("userId");
   const db = getDb();
 
-  const body = await c.req.json<{ returnUrl: string }>();
+  const body = await safeJsonParse<{ returnUrl: string }>(c);
+
+  if (!body) {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
 
   if (!body.returnUrl) {
     return c.json({ error: "Missing required field: returnUrl" }, 400);
+  }
+
+  // Validate redirect URL to prevent open redirect attacks
+  if (!isValidRedirectUrl(body.returnUrl)) {
+    return c.json({ error: "Invalid returnUrl: must be a valid URL on allowed domain" }, 400);
   }
 
   const [user] = await db.select().from(users).where(eq(users.clerkId, clerkId)).limit(1);
