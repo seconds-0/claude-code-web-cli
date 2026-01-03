@@ -42,12 +42,6 @@ export default function TerminalSection({
     setIsFullscreen(!!document.fullscreenElement);
   }, []);
 
-  const handleKeyPress = useCallback((key: string) => {
-    // TODO: Implement key sending to terminal via a global event or context
-    // For now, accessory bar keys are visual-only on mobile
-    console.log("Accessory key pressed:", key);
-  }, []);
-
   const handleMenuPress = useCallback(() => {
     setShowMobileMenu(!showMobileMenu);
   }, [showMobileMenu]);
@@ -92,7 +86,7 @@ export default function TerminalSection({
 
       {/* Mobile Accessory Bar */}
       <TerminalAccessoryBar
-        onKeyPress={handleKeyPress}
+        workspaceId={workspaceId}
         onMenuPress={handleMenuPress}
         disabled={!isReady || !ipAddress}
       />
