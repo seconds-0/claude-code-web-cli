@@ -1,13 +1,15 @@
 "use client";
 
+import { useCallback } from "react";
+
 interface TerminalAccessoryBarProps {
-  onKeyPress: (key: string) => void;
+  workspaceId: string;
   onMenuPress: () => void;
   disabled?: boolean;
 }
 
 export default function TerminalAccessoryBar({
-  onKeyPress,
+  workspaceId,
   onMenuPress,
   disabled = false,
 }: TerminalAccessoryBarProps) {
@@ -16,7 +18,20 @@ export default function TerminalAccessoryBar({
     { label: "TAB", value: "\t" },
     { label: "↑", value: "\x1b[A" },
     { label: "↓", value: "\x1b[B" },
+    { label: "←", value: "\x1b[D" },
+    { label: "→", value: "\x1b[C" },
   ];
+
+  // Dispatch custom event to send key to terminal
+  const sendKey = useCallback(
+    (key: string) => {
+      const event = new CustomEvent("terminal-input", {
+        detail: { workspaceId, key },
+      });
+      window.dispatchEvent(event);
+    },
+    [workspaceId]
+  );
 
   return (
     <div className="accessory-bar">
@@ -24,7 +39,7 @@ export default function TerminalAccessoryBar({
         <button
           key={key.label}
           className="accessory-btn"
-          onClick={() => onKeyPress(key.value)}
+          onClick={() => sendKey(key.value)}
           disabled={disabled}
           aria-label={key.label}
         >
