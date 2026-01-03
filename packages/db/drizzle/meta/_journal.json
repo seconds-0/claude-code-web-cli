@@ -43,6 +43,13 @@
       "when": 1767384058730,
       "tag": "0005_lazy_meltdown",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1767421081291,
+      "tag": "0006_majestic_multiple_man",
+      "breakpoints": true
     }
   ]
 }
