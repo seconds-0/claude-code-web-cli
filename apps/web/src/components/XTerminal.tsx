@@ -356,8 +356,23 @@ export default function XTerminal({
         console.warn("[XTerminal] Web links addon not available:", e);
       }
 
-      // Prevent browser from capturing Ctrl+W/T/N/L (critical for vim/tmux)
+      // Custom key event handler for terminal shortcuts
       term.attachCustomKeyEventHandler((event) => {
+        // Handle Ctrl+V for Windows/Linux paste (Mac uses Cmd+V which works natively)
+        // Ctrl+V conflicts with terminal escape sequences, so we intercept it
+        if (event.ctrlKey && event.key.toLowerCase() === "v" && !event.metaKey) {
+          event.preventDefault();
+          navigator.clipboard.readText().then((text) => {
+            if (text && wsRef.current?.readyState === WebSocket.OPEN) {
+              wsRef.current.send("0" + text);
+            }
+          }).catch((err) => {
+            console.warn("[XTerminal] Clipboard paste failed:", err);
+          });
+          return false; // Don't let xterm handle Ctrl+V
+        }
+
+        // Prevent browser from capturing Ctrl+W/T/N/L (critical for vim/tmux)
         if (event.ctrlKey && ["w", "t", "n", "l"].includes(event.key.toLowerCase())) {
           // Prevent browser from handling (e.g., Ctrl+W closing tab)
           event.preventDefault();
