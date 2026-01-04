@@ -1,14 +1,17 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import Terminal from "./Terminal";
 import TerminalAccessoryBar from "./TerminalAccessoryBar";
+import BootLog from "./BootLog";
 
 interface TerminalSectionProps {
   workspaceId: string;
   workspaceName: string;
   ipAddress?: string;
   isReady: boolean;
+  canStart?: boolean;
+  isStarting?: boolean; // True when workspace/instance is provisioning or starting
 }
 
 export default function TerminalSection({
@@ -16,10 +19,60 @@ export default function TerminalSection({
   workspaceName,
   ipAddress,
   isReady,
+  canStart = false,
+  isStarting = false,
 }: TerminalSectionProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [isBooting, setIsBooting] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [terminalRevealed, setTerminalRevealed] = useState(false);
+
+  // Track when we should show the boot log
+  // Show boot log when: starting to boot (canStart triggers auto-start) OR already starting/provisioning
+  useEffect(() => {
+    if ((canStart || isStarting) && !isReady) {
+      setIsBooting(true);
+    }
+  }, [canStart, isStarting, isReady]);
+
+  // Handle terminal becoming ready - trigger reveal animation
+  useEffect(() => {
+    if (isReady && ipAddress && isBooting) {
+      // Small delay before showing terminal for smooth transition
+      setTimeout(() => {
+        setShowTerminal(true);
+        setIsBooting(false);
+        // Trigger reveal animation
+        setTimeout(() => {
+          setTerminalRevealed(true);
+        }, 50);
+      }, 300);
+    } else if (isReady && ipAddress && !isBooting) {
+      // Already ready, no animation needed
+      setShowTerminal(true);
+      setTerminalRevealed(true);
+    }
+  }, [isReady, ipAddress, isBooting]);
+
+  // Called when BootLog signals ready
+  const handleBootReady = useCallback(() => {
+    // The useEffect above handles the transition
+  }, []);
+
+  // Determine header status
+  const getHeaderStatus = () => {
+    if (isReady && ipAddress) {
+      return { text: "● CONNECTED", className: "connected" };
+    }
+    if (isBooting) {
+      return { text: "◉ STARTING...", className: "starting" };
+    }
+    return { text: "○ OFFLINE", className: "offline" };
+  };
+
+  const headerStatus = getHeaderStatus();
 
   const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
@@ -58,9 +111,7 @@ export default function TerminalSection({
           TERMINAL.01 / {workspaceName.toUpperCase().replace(/\s+/g, "_")}
         </span>
         <div className="terminal-header-right">
-          <span className={`status ${isReady && ipAddress ? "connected" : "offline"}`}>
-            {isReady && ipAddress ? "● CONNECTED" : "○ OFFLINE"}
-          </span>
+          <span className={`status ${headerStatus.className}`}>{headerStatus.text}</span>
           <button
             onClick={toggleFullscreen}
             className="fullscreen-btn"
@@ -73,8 +124,17 @@ export default function TerminalSection({
 
       {/* Terminal Screen */}
       <div className={`terminal-screen ${isFullscreen ? "fullscreen" : ""}`}>
-        {isReady && ipAddress ? (
-          <Terminal workspaceId={workspaceId} ipAddress={ipAddress} />
+        {showTerminal && isReady && ipAddress ? (
+          <div className={`terminal-reveal ${terminalRevealed ? "revealed" : ""}`}>
+            <Terminal workspaceId={workspaceId} ipAddress={ipAddress} />
+          </div>
+        ) : isBooting ? (
+          <BootLog
+            workspaceId={workspaceId}
+            canStart={canStart}
+            onReady={handleBootReady}
+            isAlreadyStarting={isStarting && !canStart}
+          />
         ) : (
           <div className="terminal-placeholder">
             <div className="placeholder-status">AWAITING_CONNECTION</div>
@@ -157,8 +217,33 @@ export default function TerminalSection({
           color: var(--success);
         }
 
+        .status.starting {
+          color: var(--primary);
+          animation: pulse 1.5s ease-in-out infinite;
+        }
+
         .status.offline {
           color: var(--muted);
+        }
+
+        @keyframes pulse {
+          0%,
+          100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+        }
+
+        .terminal-reveal {
+          height: 100%;
+          opacity: 0;
+          transition: opacity 0.3s ease-out;
+        }
+
+        .terminal-reveal.revealed {
+          opacity: 1;
         }
 
         .fullscreen-btn {

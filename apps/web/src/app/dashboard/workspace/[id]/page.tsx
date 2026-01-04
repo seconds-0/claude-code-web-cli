@@ -92,6 +92,11 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
   const canStop = workspace.instance?.status === "running";
   const canSuspend = workspace.status === "ready" && workspace.instance?.status === "running";
   const isTerminalReady = workspace.instance?.status === "running";
+  // isStarting = workspace is provisioning or instance is starting (but not yet running)
+  const isStarting =
+    workspace.status === "provisioning" ||
+    workspace.instance?.status === "pending" ||
+    workspace.instance?.status === "starting";
 
   return (
     <>
@@ -162,12 +167,7 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
             </div>
           </div>
 
-          <WorkspaceActions
-            workspaceId={workspace.id}
-            canStart={canStart}
-            canStop={canStop}
-            canSuspend={canSuspend}
-          />
+          <WorkspaceActions workspaceId={workspace.id} canStop={canStop} canSuspend={canSuspend} />
         </div>
 
         {/* Terminal Section */}
@@ -176,6 +176,8 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
           workspaceName={workspace.name}
           ipAddress={workspace.instance?.ipAddress}
           isReady={isTerminalReady}
+          canStart={canStart}
+          isStarting={isStarting}
         />
 
         {/* Info Grid */}
