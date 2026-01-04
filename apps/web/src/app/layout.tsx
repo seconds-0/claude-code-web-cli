@@ -19,6 +19,15 @@ export const metadata: Metadata = {
   title: "untethered.computer",
   description:
     "Your computer, untethered. Instant cloud terminal, ready for Claude Code or any coding agent.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/favicon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
