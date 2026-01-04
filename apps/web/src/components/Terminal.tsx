@@ -43,16 +43,6 @@ export default function Terminal({ workspaceId, ipAddress, onTerminalReady }: Te
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Ref callback to expose terminal handle to parent
-  const terminalRefCallback = useCallback(
-    (handle: XTerminalHandle | null) => {
-      if (handle && onTerminalReady) {
-        onTerminalReady(handle);
-      }
-    },
-    [onTerminalReady]
-  );
-
   // Fetch connection info - try direct connect first, fall back to relay
   const fetchConnectionInfo = useCallback(async () => {
     try {
@@ -235,13 +225,13 @@ export default function Terminal({ workspaceId, ipAddress, onTerminalReady }: Te
 
   return (
     <XTerminal
-      ref={terminalRefCallback}
       workspaceId={workspaceId}
       wsUrl={connectionInfo.url}
       connectionMode={connectionInfo.mode}
       onConnect={() => console.log(`Terminal connected via ${connectionInfo.mode}`)}
       onDisconnect={() => console.log("Terminal disconnected")}
       onError={(err) => setError(err)}
+      onReady={onTerminalReady}
     />
   );
 }

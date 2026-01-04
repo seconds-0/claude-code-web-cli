@@ -14,6 +14,7 @@ interface XTerminalProps {
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: string) => void;
+  onReady?: (handle: XTerminalHandle) => void; // Called when terminal is ready for external control
 }
 
 // Exposed methods for external control (e.g., mobile toolbar)
@@ -47,7 +48,7 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T 
 const initializedContainers = new WeakSet<HTMLElement>();
 
 const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(function XTerminal(
-  { workspaceId, wsUrl, connectionMode, onConnect, onDisconnect, onError },
+  { workspaceId, wsUrl, connectionMode, onConnect, onDisconnect, onError, onReady },
   ref
 ) {
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -73,24 +74,23 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(function XTerminal
   const MAX_RECONNECT_ATTEMPTS = 5;
   const RECONNECT_DELAY_MS = 2000;
 
-  // Expose methods for external control (e.g., mobile toolbar)
-  useImperativeHandle(
-    ref,
-    () => ({
-      sendKey: (key: string) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send("0" + key);
-        }
-      },
-      focus: () => {
-        xtermRef.current?.focus();
-      },
-      fit: () => {
-        fitAddonRef.current?.fit();
-      },
-    }),
-    []
-  );
+  // Create handle object for external control (e.g., mobile toolbar)
+  const handleRef = useRef<XTerminalHandle>({
+    sendKey: (key: string) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send("0" + key);
+      }
+    },
+    focus: () => {
+      xtermRef.current?.focus();
+    },
+    fit: () => {
+      fitAddonRef.current?.fit();
+    },
+  });
+
+  // Expose methods via ref (for forwardRef usage)
+  useImperativeHandle(ref, () => handleRef.current, []);
 
   // Build the full WebSocket URL
   // For relay mode, wsUrl is relative (e.g., /ws/terminal?token=...) so we need to prepend the base
@@ -451,23 +451,29 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(function XTerminal
       xtermRef.current = term;
       fitAddonRef.current = fitAddon;
 
+      // Notify parent that terminal is ready for external control
+      onReady?.(handleRef.current);
+
       // Connect after terminal is ready
       connect();
     };
 
     initTerminal();
 
-    // Handle window resize with debouncing to avoid excessive fit() calls
+    // Use ResizeObserver instead of window resize for iOS compatibility
+    // iOS doesn't fire window resize when virtual keyboard opens
     const debouncedFit = debounce(() => {
-      if (fitAddonRef.current) {
-        fitAddonRef.current.fit();
-      }
-    }, 100);
+      fitAddonRef.current?.fit();
+    }, 50);
 
-    window.addEventListener("resize", debouncedFit);
+    let resizeObserver: ResizeObserver | null = null;
+    if (terminalRef.current) {
+      resizeObserver = new ResizeObserver(debouncedFit);
+      resizeObserver.observe(terminalRef.current);
+    }
 
     return () => {
-      window.removeEventListener("resize", debouncedFit);
+      resizeObserver?.disconnect();
 
       // Cleanup reconnect timeout
       if (reconnectTimeoutRef.current) {
@@ -517,9 +523,17 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(function XTerminal
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         // App has become visible again
-        if (wsRef.current?.readyState !== WebSocket.OPEN) {
-          console.log("[XTerminal] App resumed - checking connection");
-          // Reset reconnect counter and try to connect
+        const wsState = wsRef.current?.readyState;
+
+        // Only reconnect if socket is closed or doesn't exist
+        // Guard against CONNECTING (0) or CLOSING (2) states to prevent duplicate connections
+        if (wsState === undefined || wsState === WebSocket.CLOSED) {
+          console.log("[XTerminal] App resumed - reconnecting");
+          // Clear any pending reconnect timeout to prevent duplicate attempts
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
+          }
           reconnectAttemptRef.current = 0;
           connect();
         }

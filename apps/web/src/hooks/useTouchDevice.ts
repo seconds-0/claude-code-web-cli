@@ -22,8 +22,16 @@ export function useTouchDevice(): boolean {
       setIsTouchDevice(e.matches);
     };
 
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
+    // Use addEventListener if available (modern browsers), fallback to addListener (iOS 13, older Safari)
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    } else {
+      // Fallback for older browsers (iOS 13, Safari <14)
+      // addListener/removeListener are deprecated but needed for older Safari
+      mediaQuery.addListener(handleChange);
+      return () => mediaQuery.removeListener(handleChange);
+    }
   }, []);
 
   return isTouchDevice;

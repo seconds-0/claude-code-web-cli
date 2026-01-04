@@ -96,12 +96,13 @@ export default function TerminalSection({
         className="terminal-screen"
         style={{
           // Use visual viewport height for mobile keyboard support
+          // Clamp to minimum 200px to prevent negative/tiny heights on small screens or landscape
           height: isFullscreen
             ? "calc(100vh - 40px)"
             : isTouchDevice && viewportHeight > 0
-              ? `${viewportHeight - 320 - (isTouchDevice ? 64 : 0)}px` // Account for toolbar height
+              ? `${Math.max(viewportHeight - 320 - 64, 200)}px` // Account for header (~40px) + toolbar (64px) + margins
               : "calc(100vh - 320px)",
-          minHeight: isFullscreen ? undefined : "300px",
+          minHeight: isFullscreen ? undefined : "200px",
           transition: isKeyboardOpen ? "none" : "height 0.1s ease", // Smooth except when keyboard animating
         }}
       >
@@ -149,18 +150,17 @@ export default function TerminalSection({
       </div>
 
       {/* Mobile command toolbar - only shown on touch devices when terminal is ready */}
+      {/* Note: Don't call focus() here - it would summon the virtual keyboard on every button press,
+          making it impossible to use arrow keys for navigation without the keyboard taking up half the screen.
+          The buttons use onPointerDown + preventDefault to keep focus state as-is. */}
       {isTouchDevice && isReady && ipAddress && terminalHandle && (
         <MobileToolbar
-          onKeyPress={(key) => {
-            terminalHandle.sendKey(key);
-            terminalHandle.focus();
-          }}
+          onKeyPress={(key) => terminalHandle.sendKey(key)}
           onPaste={async () => {
             try {
               const text = await navigator.clipboard.readText();
               if (text) {
                 terminalHandle.sendKey(text);
-                terminalHandle.focus();
               }
             } catch (err) {
               console.warn("[TerminalSection] Clipboard read failed:", err);
