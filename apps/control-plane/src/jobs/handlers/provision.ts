@@ -31,7 +31,7 @@ import { generateCaptureToken, getTokensForUser } from "../../routes/anthropic.j
 import type { TokenBlob } from "../../services/encryption.js";
 
 // Cloud-init template for user boxes
-function generateCloudInit(params: {
+export function generateCloudInit(params: {
   tailscaleAuthKey?: string; // Optional - Tailscale currently disabled
   hostname: string;
   volumeDevice?: string;
