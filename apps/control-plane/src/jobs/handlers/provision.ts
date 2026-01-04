@@ -32,7 +32,7 @@ import type { TokenBlob } from "../../services/encryption.js";
 
 // Cloud-init template for user boxes
 function generateCloudInit(params: {
-  tailscaleAuthKey: string;
+  tailscaleAuthKey?: string; // Optional - Tailscale currently disabled
   hostname: string;
   volumeDevice?: string;
   sshPublicKey?: string;
@@ -128,11 +128,15 @@ users:
     : ""
 }
 runcmd:
-  # Connect to Tailscale
+  ${
+    tailscaleAuthKey
+      ? `# Connect to Tailscale
   - tailscale up --authkey=${tailscaleAuthKey} --hostname=${hostname}
-
-  # Wait for Tailscale interface to be ready (ttyd binds to tailscale0)
-  - for i in $(seq 1 30); do tailscale status && break || sleep 2; done
+  # Wait for Tailscale interface to be ready
+  - for i in $(seq 1 30); do tailscale status && break || sleep 2; done`
+      : `# Tailscale disabled - using public IP directly
+  - echo "Tailscale disabled - using public IP for terminal access"`
+  }
 
   # Mount persistent volume if attached
   ${
@@ -213,16 +217,17 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
       .set({ status: "starting", startedAt: new Date() })
       .where(eq(workspaceInstances.workspaceId, workspaceId));
 
-    // Step 2: Create Tailscale auth key
-    // Note: Tags require ACL configuration in Tailscale - omitting for now
-    console.log(`[provision] Creating Tailscale auth key`);
-    const authKey = await tailscale.createAuthKey({
-      description: `ccc-workspace-${workspaceId}`,
-      expirySeconds: 3600, // 1 hour
-      ephemeral: true,
-      preauthorized: true,
-    });
-    console.log(`[provision] Created Tailscale auth key: ${authKey.id}`);
+    // Step 2: Tailscale auth key - DISABLED
+    //
+    // TODO: IMPLEMENT TAILSCALE AS OPT-IN FEATURE
+    // Currently disabled for fast provisioning. Future implementation:
+    // - Add workspace.useTailscale boolean field
+    // - If enabled, create auth key and wait for device
+    // - If disabled (default), use public IP directly
+    // - Let users opt-in via workspace settings for extra security
+    //
+    // const authKey = await tailscale.createAuthKey({...});
+    console.log(`[provision] Tailscale disabled - using public IP for fast provisioning`);
 
     // Step 3: Create or verify Hetzner volume
     if (!workspace.volume?.hetznerVolumeId) {
@@ -297,7 +302,7 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
     }
 
     const cloudInit = generateCloudInit({
-      tailscaleAuthKey: authKey.key,
+      // tailscaleAuthKey omitted - Tailscale currently disabled
       hostname,
       volumeDevice,
       sshPublicKey: process.env["SSH_PUBLIC_KEY"],
@@ -347,32 +352,26 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
     });
     console.log(`[provision] Recorded server start cost event`);
 
-    // Step 7: Try to get Tailscale device (optional - public IP is primary)
-    // Don't block on Tailscale - workspace is usable via public IP
+    // Step 7: Skip Tailscale - use public IP as primary connection method
     //
-    // TODO(HIGH PRIORITY): FIX TAILSCALE PROPERLY
-    // This is a WORKAROUND - we're bypassing Tailscale because it's failing to connect.
-    // Tailscale provides:
+    // TODO(HIGH PRIORITY): FIX TAILSCALE AND RE-ENABLE
+    // Tailscale is currently disabled because it's failing to connect.
+    // We need to investigate and fix the root cause:
+    // - Auth key expiry issues
+    // - Cloud-init race conditions
+    // - Tailscale service not starting
+    //
+    // Without Tailscale we lose:
     // - Private network between control plane and user boxes
     // - NAT traversal for users behind firewalls
-    // - Encrypted tunnel without exposing ttyd to public internet
-    // Without Tailscale, we rely on public IP + firewall rules which is less secure.
-    // Investigate why Tailscale auth is failing and fix the root cause.
-    // Likely issues: auth key expiry, cloud-init race condition, or Tailscale service not starting.
+    // - Encrypted tunnel (currently ttyd exposed on public IP with firewall)
     //
-    let tailscaleIp: string | null = null;
-    console.log(`[provision] Checking for Tailscale device (optional, 30s timeout)`);
-    try {
-      tailscaleDevice = await tailscale.waitForDevice(hostname, {
-        timeoutMs: 30_000, // 30 seconds - short timeout since it's optional
-        pollIntervalMs: 5000,
-      });
-      tailscaleIp = tailscale.getDeviceIp(tailscaleDevice);
-      console.log(`[provision] Tailscale device connected: ${tailscaleDevice.id} (${tailscaleIp})`);
-    } catch (tailscaleError) {
-      console.log(`[provision] Tailscale not available (optional): ${tailscaleError}`);
-      console.log(`[provision] Continuing with public IP: ${hetznerServer.public_net.ipv4.ip}`);
-    }
+    // For now, workspace is accessible via public IP which is configured in the
+    // terminal relay (websocket/terminal.ts uses publicIp || tailscaleIp).
+    //
+    const tailscaleIp: string | null = null; // Disabled - using public IP
+    console.log(`[provision] Using public IP for terminal access: ${publicIp}`);
+    console.log(`[provision] Tailscale disabled - see TODO in provision.ts to re-enable`);
 
     // Step 8: Update database with final state
     await db
