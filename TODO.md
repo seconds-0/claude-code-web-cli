@@ -8,7 +8,99 @@ Long-term planning hub. Update when starting/completing work or discovering new 
 
 ## In Progress
 
-_Nothing currently in progress_
+### Billing System Setup (PR #10 merged, needs activation)
+
+**Goal:** Enable Stripe subscriptions and usage-based billing
+
+Code is complete and tested (~133 tests). Needs external service configuration to activate.
+
+#### Step 1: Stripe Account Setup
+
+- [ ] Create Stripe account (or switch from test to live mode)
+- [ ] Set `STRIPE_SECRET_KEY` environment variable
+- [ ] Run setup script to create products/prices/meters:
+  ```bash
+  cd apps/control-plane
+  STRIPE_SECRET_KEY=sk_xxx pnpm tsx src/scripts/stripe-setup.ts
+  ```
+- [ ] Copy output IDs to environment variables:
+  - `STRIPE_PRODUCT_STARTER`, `STRIPE_PRODUCT_PRO`, `STRIPE_PRODUCT_UNLIMITED`
+  - `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_UNLIMITED`
+  - `STRIPE_METER_COMPUTE`, `STRIPE_METER_STORAGE`, `STRIPE_METER_VOICE`
+
+#### Step 2: Stripe Webhook Configuration
+
+- [ ] Go to Stripe Dashboard → Developers → Webhooks
+- [ ] Add endpoint: `https://api.untethered.computer/webhooks/stripe`
+- [ ] Select events:
+  - `customer.subscription.created`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
+  - `invoice.paid`
+  - `invoice.payment_failed`
+  - `customer.subscription.trial_will_end`
+- [ ] Copy signing secret to `STRIPE_WEBHOOK_SECRET`
+
+#### Step 3: QStash Setup (Upstash)
+
+- [ ] Create Upstash account at https://upstash.com
+- [ ] Create QStash instance
+- [ ] Copy credentials:
+  - `QSTASH_TOKEN` (for setup script)
+  - `QSTASH_CURRENT_SIGNING_KEY` (for signature verification)
+  - `QSTASH_NEXT_SIGNING_KEY` (for key rotation)
+- [ ] Run setup script to create scheduled jobs:
+  ```bash
+  cd apps/control-plane
+  QSTASH_TOKEN=xxx API_URL=https://api.untethered.computer pnpm tsx src/scripts/qstash-setup.ts
+  ```
+
+#### Step 4: Railway Environment Variables
+
+Add all variables to Railway control-plane service:
+
+```bash
+# Stripe
+STRIPE_SECRET_KEY=sk_live_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+STRIPE_PRODUCT_STARTER=prod_xxx
+STRIPE_PRODUCT_PRO=prod_xxx
+STRIPE_PRODUCT_UNLIMITED=prod_xxx
+STRIPE_PRICE_STARTER=price_xxx
+STRIPE_PRICE_PRO=price_xxx
+STRIPE_PRICE_UNLIMITED=price_xxx
+STRIPE_METER_COMPUTE=mtr_xxx
+STRIPE_METER_STORAGE=mtr_xxx
+STRIPE_METER_VOICE=mtr_xxx
+
+# QStash
+QSTASH_CURRENT_SIGNING_KEY=sig_xxx
+QSTASH_NEXT_SIGNING_KEY=sig_xxx
+```
+
+#### Step 5: Verification
+
+- [ ] Deploy control-plane with new env vars
+- [ ] Check `/jobs/health` returns `qstashConfigured: true`
+- [ ] Check `/webhooks/stripe/health` returns `stripeConfigured: true`
+- [ ] Test checkout flow with Stripe test card (4242 4242 4242 4242)
+- [ ] Verify webhook events are received (check Stripe Dashboard → Webhooks → Logs)
+- [ ] Verify QStash jobs are running (check Upstash Dashboard → QStash → Schedules)
+
+#### Billing Features Included
+
+| Feature                                       | Status        |
+| --------------------------------------------- | ------------- |
+| Free tier (30 compute min, 10GB storage)      | ✅ Code ready |
+| Starter tier ($9/mo, 1800 min, 25GB)          | ✅ Code ready |
+| Pro tier ($19/mo, unlimited compute, 100GB)   | ✅ Code ready |
+| Unlimited tier ($49/mo, everything unlimited) | ✅ Code ready |
+| Usage alerts (50%, 80%, 100%)                 | ✅ Code ready |
+| Overage billing                               | ✅ Code ready |
+| Stripe Customer Portal                        | ✅ Code ready |
+| Webhook idempotency                           | ✅ Code ready |
+
+---
 
 ---
 
