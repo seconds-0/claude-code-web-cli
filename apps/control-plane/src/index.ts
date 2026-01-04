@@ -10,10 +10,11 @@ const port = parseInt(process.env["PORT"] || "8080", 10);
 
 console.log(`Starting control-plane on port ${port}`);
 
-// Create HTTP server
+// Create HTTP server - bind to 0.0.0.0 for Railway healthcheck access
 const server = serve({
   fetch: app.fetch,
   port,
+  hostname: "0.0.0.0",
   createServer,
 });
 
