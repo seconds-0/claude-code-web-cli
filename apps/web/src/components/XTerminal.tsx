@@ -63,7 +63,7 @@ export default function XTerminal({
   const localEchoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const localEchoEnabledRef = useRef(true); // Can be disabled for full-screen apps
 
-  const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
+  const [_connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const reconnectAttemptRef = useRef(0); // Use ref to avoid triggering effect re-runs
   const [isBuffering, setIsBuffering] = useState(false); // UX indicator for flow control
 
@@ -386,13 +386,16 @@ export default function XTerminal({
         // Ctrl+V conflicts with terminal escape sequences, so we intercept it
         if (event.ctrlKey && event.key.toLowerCase() === "v" && !event.metaKey) {
           event.preventDefault();
-          navigator.clipboard.readText().then((text) => {
-            if (text && wsRef.current?.readyState === WebSocket.OPEN) {
-              wsRef.current.send("0" + text);
-            }
-          }).catch((err) => {
-            console.warn("[XTerminal] Clipboard paste failed:", err);
-          });
+          navigator.clipboard
+            .readText()
+            .then((text) => {
+              if (text && wsRef.current?.readyState === WebSocket.OPEN) {
+                wsRef.current.send("0" + text);
+              }
+            })
+            .catch((err) => {
+              console.warn("[XTerminal] Clipboard paste failed:", err);
+            });
           return false; // Don't let xterm handle Ctrl+V
         }
 
@@ -512,66 +515,6 @@ export default function XTerminal({
   }, [connect]);
 
   // Status indicator
-  const getStatusColor = () => {
-    switch (connectionState) {
-      case "connected":
-        return "var(--success)";
-      case "connecting":
-        return "var(--warning)";
-      case "disconnected":
-        return "var(--muted)";
-      case "error":
-        return "var(--error)";
-    }
-  };
-
-  const getStatusText = () => {
-    switch (connectionState) {
-      case "connected":
-        return "Connected";
-      case "connecting":
-        return "Connecting...";
-      case "disconnected":
-        return "Disconnected";
-      case "error":
-        return "Connection Error";
-    }
-  };
-
-  // Get connection mode badge
-  const getModeBadge = () => {
-    if (connectionState !== "connected") return null;
-    return connectionMode === "direct" ? (
-      <span
-        style={{
-          background: "var(--success)",
-          color: "#000",
-          padding: "0.125rem 0.375rem",
-          fontSize: "0.5rem",
-          fontWeight: 600,
-          letterSpacing: "0.05em",
-          textTransform: "uppercase",
-        }}
-      >
-        DIRECT
-      </span>
-    ) : (
-      <span
-        style={{
-          background: "var(--muted)",
-          color: "#000",
-          padding: "0.125rem 0.375rem",
-          fontSize: "0.5rem",
-          fontWeight: 600,
-          letterSpacing: "0.05em",
-          textTransform: "uppercase",
-        }}
-      >
-        RELAY
-      </span>
-    );
-  };
-
   return (
     <div
       style={{
@@ -582,49 +525,7 @@ export default function XTerminal({
         background: "#0d0d0d",
       }}
     >
-      {/* Status bar */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0.25rem 0.5rem",
-          fontSize: "0.625rem",
-          fontFamily: "var(--font-mono)",
-          color: "var(--muted)",
-          borderBottom: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
-        <span>WS.{workspaceId.slice(0, 8).toUpperCase()}</span>
-        <span style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
-          {/* Connection mode badge */}
-          {getModeBadge()}
-          {/* Flow control buffering indicator */}
-          {isBuffering && (
-            <span
-              style={{
-                color: "var(--warning)",
-                fontSize: "0.5625rem",
-                animation: "pulse 1s ease-in-out infinite",
-              }}
-            >
-              Buffering...
-            </span>
-          )}
-          <span
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: getStatusColor(),
-            }}
-          />
-          {getStatusText()}
-        </span>
-      </div>
-
-      {/* Terminal container */}
+      {/* Terminal container - status bar removed as TerminalSection provides it */}
       <div
         ref={terminalRef}
         style={{
