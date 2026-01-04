@@ -347,15 +347,32 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
     });
     console.log(`[provision] Recorded server start cost event`);
 
-    // Step 7: Wait for Tailscale device to appear
-    console.log(`[provision] Waiting for Tailscale device`);
-    tailscaleDevice = await tailscale.waitForDevice(hostname, {
-      timeoutMs: 180_000, // 3 minutes
-      pollIntervalMs: 5000,
-    });
-
-    const tailscaleIp = tailscale.getDeviceIp(tailscaleDevice);
-    console.log(`[provision] Tailscale device connected: ${tailscaleDevice.id} (${tailscaleIp})`);
+    // Step 7: Try to get Tailscale device (optional - public IP is primary)
+    // Don't block on Tailscale - workspace is usable via public IP
+    //
+    // TODO(HIGH PRIORITY): FIX TAILSCALE PROPERLY
+    // This is a WORKAROUND - we're bypassing Tailscale because it's failing to connect.
+    // Tailscale provides:
+    // - Private network between control plane and user boxes
+    // - NAT traversal for users behind firewalls
+    // - Encrypted tunnel without exposing ttyd to public internet
+    // Without Tailscale, we rely on public IP + firewall rules which is less secure.
+    // Investigate why Tailscale auth is failing and fix the root cause.
+    // Likely issues: auth key expiry, cloud-init race condition, or Tailscale service not starting.
+    //
+    let tailscaleIp: string | null = null;
+    console.log(`[provision] Checking for Tailscale device (optional, 30s timeout)`);
+    try {
+      tailscaleDevice = await tailscale.waitForDevice(hostname, {
+        timeoutMs: 30_000, // 30 seconds - short timeout since it's optional
+        pollIntervalMs: 5000,
+      });
+      tailscaleIp = tailscale.getDeviceIp(tailscaleDevice);
+      console.log(`[provision] Tailscale device connected: ${tailscaleDevice.id} (${tailscaleIp})`);
+    } catch (tailscaleError) {
+      console.log(`[provision] Tailscale not available (optional): ${tailscaleError}`);
+      console.log(`[provision] Continuing with public IP: ${hetznerServer.public_net.ipv4.ip}`);
+    }
 
     // Step 8: Update database with final state
     await db
@@ -392,9 +409,11 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
         console.log(`[provision] Cleaning up server ${hetznerServer.id}`);
         await hetzner.deleteServer(hetznerServer.id);
       }
-      if (tailscaleDevice) {
-        console.log(`[provision] Cleaning up Tailscale device ${tailscaleDevice.id}`);
-        await tailscale.deleteDevice(tailscaleDevice.id);
+      // Type assertion needed due to TypeScript control flow limitations with nested try-catch
+      const tsDevice = tailscaleDevice as TailscaleDevice | null;
+      if (tsDevice?.id) {
+        console.log(`[provision] Cleaning up Tailscale device ${tsDevice.id}`);
+        await tailscale.deleteDevice(tsDevice.id);
       }
     } catch (cleanupError) {
       console.error(`[provision] Error during cleanup:`, cleanupError);
