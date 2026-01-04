@@ -23,8 +23,9 @@ type ConnectionState = "connecting" | "connected" | "disconnected" | "error";
 const HIGH_WATERMARK = 500_000; // 500KB - pause when exceeded
 const LOW_WATERMARK = 50_000; // 50KB - resume when below
 
-// Local echo disabled - direct connect mode is fast enough (~50ms)
-// and the reconciliation logic has edge cases that cause double-input
+// Local echo constants - reduces perceived latency
+const LOCAL_ECHO_TIMEOUT_MS = 1000; // Clear prediction if server doesn't confirm within this time
+const PRINTABLE_CHAR_REGEX = /^[\x20-\x7E]$/; // ASCII printable characters (space to tilde)
 
 // Debounce utility
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
@@ -57,7 +58,12 @@ export default function XTerminal({
   const pendingDataRef = useRef(0);
   const isPausedRef = useRef(false);
 
-  const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
+  // Local echo state - optimistic keystroke prediction
+  const pendingEchoRef = useRef<string>(""); // Characters we've echoed locally but not confirmed
+  const localEchoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localEchoEnabledRef = useRef(true); // Can be disabled for full-screen apps
+
+  const [_connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const reconnectAttemptRef = useRef(0); // Use ref to avoid triggering effect re-runs
   const [isBuffering, setIsBuffering] = useState(false); // UX indicator for flow control
 
@@ -153,7 +159,33 @@ export default function XTerminal({
         if (msgType === 48) {
           // '0' = Output message - write to terminal with flow control
           const decoder = new TextDecoder();
-          const text = decoder.decode(payload);
+          let text = decoder.decode(payload);
+
+          // Detect full-screen app mode (alternate screen buffer)
+          // ESC[?1049h = enter alternate screen, ESC[?1049l = exit
+          if (text.includes("\x1b[?1049h") || text.includes("\x1b[?47h")) {
+            localEchoEnabledRef.current = false;
+            pendingEchoRef.current = ""; // Clear predictions when entering full-screen
+          } else if (text.includes("\x1b[?1049l") || text.includes("\x1b[?47l")) {
+            localEchoEnabledRef.current = true;
+          }
+
+          // Strip characters we've already echoed locally (optimistic echo reconciliation)
+          if (pendingEchoRef.current.length > 0) {
+            let stripped = 0;
+            for (let i = 0; i < text.length && i < pendingEchoRef.current.length; i++) {
+              if (text[i] === pendingEchoRef.current[i]) {
+                stripped++;
+              } else {
+                break; // Mismatch - stop stripping
+              }
+            }
+            if (stripped > 0) {
+              text = text.slice(stripped);
+              pendingEchoRef.current = pendingEchoRef.current.slice(stripped);
+            }
+          }
+
           if (text.length > 0) {
             writeWithFlowControl(text, text.length);
           }
@@ -382,8 +414,30 @@ export default function XTerminal({
       // Handle terminal input - ttyd expects '0' + data as text string
       term.onData((data) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-          // Local echo disabled - direct connect mode is fast enough (~50ms)
-          // and the reconciliation logic has edge cases that cause double-input
+          // Optimistic local echo for printable characters (reduces perceived latency)
+          // Only echo if: single printable char, local echo enabled, and not a control sequence
+          const isPrintable = data.length === 1 && PRINTABLE_CHAR_REGEX.test(data);
+          const isControlSequence = data.charCodeAt(0) < 32 || data.charCodeAt(0) === 127;
+
+          if (isPrintable && localEchoEnabledRef.current && !isControlSequence && term) {
+            // Echo immediately to terminal
+            term.write(data);
+            pendingEchoRef.current += data;
+
+            // Set timeout to clear prediction if server doesn't confirm
+            if (localEchoTimeoutRef.current) {
+              clearTimeout(localEchoTimeoutRef.current);
+            }
+            localEchoTimeoutRef.current = setTimeout(() => {
+              // If predictions haven't been cleared, something went wrong
+              // Clear them to avoid state desync
+              if (pendingEchoRef.current.length > 0) {
+                console.warn("[XTerminal] Local echo timeout - clearing predictions");
+                pendingEchoRef.current = "";
+              }
+            }, LOCAL_ECHO_TIMEOUT_MS);
+          }
+
           // ttyd input protocol: '0' prefix + data as text
           wsRef.current.send("0" + data);
         }
@@ -422,6 +476,11 @@ export default function XTerminal({
         clearTimeout(reconnectTimeoutRef.current);
       }
 
+      // Cleanup local echo timeout
+      if (localEchoTimeoutRef.current) {
+        clearTimeout(localEchoTimeoutRef.current);
+      }
+
       // Close WebSocket
       if (wsRef.current) {
         wsRef.current.close(1000, "Component unmounting");
@@ -456,66 +515,6 @@ export default function XTerminal({
   }, [connect]);
 
   // Status indicator
-  const getStatusColor = () => {
-    switch (connectionState) {
-      case "connected":
-        return "var(--success)";
-      case "connecting":
-        return "var(--warning)";
-      case "disconnected":
-        return "var(--muted)";
-      case "error":
-        return "var(--error)";
-    }
-  };
-
-  const getStatusText = () => {
-    switch (connectionState) {
-      case "connected":
-        return "Connected";
-      case "connecting":
-        return "Connecting...";
-      case "disconnected":
-        return "Disconnected";
-      case "error":
-        return "Connection Error";
-    }
-  };
-
-  // Get connection mode badge
-  const getModeBadge = () => {
-    if (connectionState !== "connected") return null;
-    return connectionMode === "direct" ? (
-      <span
-        style={{
-          background: "var(--success)",
-          color: "#000",
-          padding: "0.125rem 0.375rem",
-          fontSize: "0.5rem",
-          fontWeight: 600,
-          letterSpacing: "0.05em",
-          textTransform: "uppercase",
-        }}
-      >
-        DIRECT
-      </span>
-    ) : (
-      <span
-        style={{
-          background: "var(--muted)",
-          color: "#000",
-          padding: "0.125rem 0.375rem",
-          fontSize: "0.5rem",
-          fontWeight: 600,
-          letterSpacing: "0.05em",
-          textTransform: "uppercase",
-        }}
-      >
-        RELAY
-      </span>
-    );
-  };
-
   return (
     <div
       style={{
@@ -526,49 +525,7 @@ export default function XTerminal({
         background: "#0d0d0d",
       }}
     >
-      {/* Status bar */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0.25rem 0.5rem",
-          fontSize: "0.625rem",
-          fontFamily: "var(--font-mono)",
-          color: "var(--muted)",
-          borderBottom: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
-        <span>WS.{workspaceId.slice(0, 8).toUpperCase()}</span>
-        <span style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
-          {/* Connection mode badge */}
-          {getModeBadge()}
-          {/* Flow control buffering indicator */}
-          {isBuffering && (
-            <span
-              style={{
-                color: "var(--warning)",
-                fontSize: "0.5625rem",
-                animation: "pulse 1s ease-in-out infinite",
-              }}
-            >
-              Buffering...
-            </span>
-          )}
-          <span
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: getStatusColor(),
-            }}
-          />
-          {getStatusText()}
-        </span>
-      </div>
-
-      {/* Terminal container */}
+      {/* Terminal container - status bar removed as TerminalSection provides it */}
       <div
         ref={terminalRef}
         style={{

@@ -52,14 +52,14 @@ async function getWorkspace(id: string, token: string): Promise<Workspace | null
 
     const data = await res.json();
     // API returns workspace, volume, instance as separate properties
-    // Use publicIp for direct connect mode, fallback to tailscaleIp for private mode
+    // Map tailscaleIp to ipAddress for UI compatibility
     return {
       ...data.workspace,
       volume: data.volume || undefined,
       instance: data.instance
         ? {
             ...data.instance,
-            ipAddress: data.instance.publicIp || data.instance.tailscaleIp,
+            ipAddress: data.instance.tailscaleIp,
           }
         : undefined,
     };
@@ -84,8 +84,13 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
     notFound();
   }
 
-  // shouldAutoStart: only for pending workspaces (first-time setup) - prevents auto-restart after user stops
-  const shouldAutoStart = workspace.status === "pending";
+  // shouldAutoStart: only for pending workspaces with no instance in progress
+  // Prevents double /start calls when instance is already being provisioned
+  const shouldAutoStart =
+    workspace.status === "pending" &&
+    (!workspace.instance ||
+      workspace.instance.status === "stopped" ||
+      !["pending", "starting", "running"].includes(workspace.instance.status));
   // canStart: includes stopped/suspended for manual restart via Start button
   const canStart =
     workspace.status === "suspended" ||
