@@ -59,7 +59,9 @@ async function getWorkspace(id: string, token: string): Promise<Workspace | null
       instance: data.instance
         ? {
             ...data.instance,
-            ipAddress: data.instance.tailscaleIp,
+            // Prefer tailscaleIp for private network, fallback to publicIp
+            // Currently Tailscale is disabled so publicIp is used
+            ipAddress: data.instance.tailscaleIp || data.instance.publicIp,
           }
         : undefined,
     };
