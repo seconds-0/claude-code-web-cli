@@ -84,8 +84,10 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
     notFound();
   }
 
+  // shouldAutoStart: only for pending workspaces (first-time setup) - prevents auto-restart after user stops
+  const shouldAutoStart = workspace.status === "pending";
+  // canStart: includes stopped/suspended for manual restart via Start button
   const canStart =
-    workspace.status === "pending" ||
     workspace.status === "suspended" ||
     workspace.instance?.status === "stopped" ||
     (workspace.status === "ready" && !workspace.instance);
@@ -167,7 +169,12 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
             </div>
           </div>
 
-          <WorkspaceActions workspaceId={workspace.id} canStop={canStop} canSuspend={canSuspend} />
+          <WorkspaceActions
+            workspaceId={workspace.id}
+            canStart={canStart}
+            canStop={canStop}
+            canSuspend={canSuspend}
+          />
         </div>
 
         {/* Terminal Section */}
@@ -176,7 +183,7 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
           workspaceName={workspace.name}
           ipAddress={workspace.instance?.ipAddress}
           isReady={isTerminalReady}
-          canStart={canStart}
+          shouldAutoStart={shouldAutoStart}
           isStarting={isStarting}
         />
 

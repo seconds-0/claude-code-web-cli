@@ -10,7 +10,7 @@ interface TerminalSectionProps {
   workspaceName: string;
   ipAddress?: string;
   isReady: boolean;
-  canStart?: boolean;
+  shouldAutoStart?: boolean; // True only for pending workspaces (first-time setup)
   isStarting?: boolean; // True when workspace/instance is provisioning or starting
 }
 
@@ -19,7 +19,7 @@ export default function TerminalSection({
   workspaceName,
   ipAddress,
   isReady,
-  canStart = false,
+  shouldAutoStart = false,
   isStarting = false,
 }: TerminalSectionProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -29,23 +29,35 @@ export default function TerminalSection({
   const [showTerminal, setShowTerminal] = useState(false);
   const [terminalRevealed, setTerminalRevealed] = useState(false);
 
+  // Refs for timeout cleanup
+  const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Track when we should show the boot log
-  // Show boot log when: starting to boot (canStart triggers auto-start) OR already starting/provisioning
+  // Show boot log when: auto-starting (pending workspace) OR already starting/provisioning
   useEffect(() => {
-    if ((canStart || isStarting) && !isReady) {
+    if ((shouldAutoStart || isStarting) && !isReady) {
       setIsBooting(true);
     }
-  }, [canStart, isStarting, isReady]);
+  }, [shouldAutoStart, isStarting, isReady]);
 
   // Handle terminal becoming ready - trigger reveal animation
   useEffect(() => {
+    // Clear any existing timeouts when effect re-runs
+    if (transitionTimeoutRef.current) {
+      clearTimeout(transitionTimeoutRef.current);
+    }
+    if (revealTimeoutRef.current) {
+      clearTimeout(revealTimeoutRef.current);
+    }
+
     if (isReady && ipAddress && isBooting) {
       // Small delay before showing terminal for smooth transition
-      setTimeout(() => {
+      transitionTimeoutRef.current = setTimeout(() => {
         setShowTerminal(true);
         setIsBooting(false);
         // Trigger reveal animation
-        setTimeout(() => {
+        revealTimeoutRef.current = setTimeout(() => {
           setTerminalRevealed(true);
         }, 50);
       }, 300);
@@ -54,6 +66,16 @@ export default function TerminalSection({
       setShowTerminal(true);
       setTerminalRevealed(true);
     }
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current);
+      }
+      if (revealTimeoutRef.current) {
+        clearTimeout(revealTimeoutRef.current);
+      }
+    };
   }, [isReady, ipAddress, isBooting]);
 
   // Called when BootLog signals ready
@@ -131,9 +153,9 @@ export default function TerminalSection({
         ) : isBooting ? (
           <BootLog
             workspaceId={workspaceId}
-            canStart={canStart}
+            canStart={shouldAutoStart}
             onReady={handleBootReady}
-            isAlreadyStarting={isStarting && !canStart}
+            isAlreadyStarting={isStarting && !shouldAutoStart}
           />
         ) : (
           <div className="terminal-placeholder">

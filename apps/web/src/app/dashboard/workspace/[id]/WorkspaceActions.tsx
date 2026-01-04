@@ -7,12 +7,14 @@ import { getApiUrl, fetchRuntimeConfig } from "@/lib/config";
 
 interface WorkspaceActionsProps {
   workspaceId: string;
+  canStart: boolean;
   canStop: boolean;
   canSuspend: boolean;
 }
 
 export default function WorkspaceActions({
   workspaceId,
+  canStart,
   canStop,
   canSuspend,
 }: WorkspaceActionsProps) {
@@ -20,7 +22,7 @@ export default function WorkspaceActions({
   const { getToken } = useAuth();
   const [isLoading, setIsLoading] = useState<string | null>(null);
 
-  async function performAction(action: "stop" | "suspend") {
+  async function performAction(action: "start" | "stop" | "suspend") {
     setIsLoading(action);
 
     try {
@@ -53,6 +55,20 @@ export default function WorkspaceActions({
 
   return (
     <div style={{ display: "flex", gap: "0.5rem" }}>
+      {canStart && (
+        <button
+          onClick={() => performAction("start")}
+          disabled={isLoading !== null}
+          style={{
+            background: "var(--success)",
+            borderColor: "var(--success)",
+            color: "var(--background)",
+          }}
+        >
+          {isLoading === "start" ? <span className="loading-text">Starting</span> : "▶ Start"}
+        </button>
+      )}
+
       {canStop && (
         <button
           onClick={() => performAction("stop")}

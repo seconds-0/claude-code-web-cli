@@ -39,12 +39,21 @@ export default function BootLog({
   const hasStarted = useRef(false);
   const isMounted = useRef(true); // Track if component is mounted
   const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const readyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Track mounted state for cleanup
   useEffect(() => {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
+      // Clean up all timeouts on unmount
+      if (readyTimeoutRef.current) {
+        clearTimeout(readyTimeoutRef.current);
+      }
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -165,6 +174,7 @@ export default function BootLog({
         try {
           const res = await fetch(`${getApiUrl()}/api/v1/workspaces/${workspaceId}`, {
             headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
           });
 
           if (!res.ok) return;
@@ -198,23 +208,25 @@ export default function BootLog({
             addLog("Establishing secure connection...");
             setProgress(90);
 
+            // Stop polling now to prevent duplicate ready handling
+            if (pollInterval.current) {
+              clearInterval(pollInterval.current);
+              pollInterval.current = null;
+            }
+
             // Brief pause then mark ready
-            setTimeout(() => {
+            readyTimeoutRef.current = setTimeout(() => {
               if (!isMounted.current) return; // Don't update if unmounted
               updateLastLog({ status: "done" });
               addLog("Environment ready.", "done");
               setProgress(100);
               setPhase("ready");
 
-              if (pollInterval.current) {
-                clearInterval(pollInterval.current);
-              }
-
               // Trigger server component refresh to update isReady prop
               router.refresh();
 
               // Trigger transition after brief pause
-              setTimeout(() => {
+              transitionTimeoutRef.current = setTimeout(() => {
                 if (isMounted.current) {
                   onReady();
                 }
