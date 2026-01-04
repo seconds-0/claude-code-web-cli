@@ -71,8 +71,9 @@ sudo -u coder git config --global pull.rebase false
 
 # Create default tmux config
 cat > /home/coder/.tmux.conf << 'TMUXCONF'
-# Enable mouse support
-set -g mouse on
+# Disable mouse support - prevents scroll wheel from changing tmux windows
+# Users interact via web terminal which handles scrolling
+set -g mouse off
 
 # Set better prefix
 set -g prefix C-a
