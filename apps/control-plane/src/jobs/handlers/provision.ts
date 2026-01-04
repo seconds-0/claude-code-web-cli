@@ -352,26 +352,20 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
     });
     console.log(`[provision] Recorded server start cost event`);
 
-    // Step 7: Skip Tailscale - use public IP as primary connection method
+    // Step 7: Tailscale disabled - default to public IP for fast provisioning
     //
-    // TODO(HIGH PRIORITY): FIX TAILSCALE AND RE-ENABLE
-    // Tailscale is currently disabled because it's failing to connect.
-    // We need to investigate and fix the root cause:
-    // - Auth key expiry issues
-    // - Cloud-init race conditions
-    // - Tailscale service not starting
-    //
-    // Without Tailscale we lose:
+    // TODO: IMPLEMENT TAILSCALE AS OPT-IN FEATURE
+    // Tailscale should be an optional security feature users can enable:
+    // - Add useTailscale boolean to workspace settings
+    // - If enabled: create auth key, configure cloud-init, wait for device
+    // - If disabled (default): use public IP directly (current behavior)
+    // Benefits of Tailscale when enabled:
     // - Private network between control plane and user boxes
-    // - NAT traversal for users behind firewalls
-    // - Encrypted tunnel (currently ttyd exposed on public IP with firewall)
+    // - NAT traversal for users behind strict firewalls
+    // - Encrypted tunnel without exposing ttyd on public IP
     //
-    // For now, workspace is accessible via public IP which is configured in the
-    // terminal relay (websocket/terminal.ts uses publicIp || tailscaleIp).
-    //
-    const tailscaleIp: string | null = null; // Disabled - using public IP
+    const tailscaleIp: string | null = null;
     console.log(`[provision] Using public IP for terminal access: ${publicIp}`);
-    console.log(`[provision] Tailscale disabled - see TODO in provision.ts to re-enable`);
 
     // Step 8: Update database with final state
     await db
