@@ -65,7 +65,7 @@ Volume mounted at /mnt/workspace:
 
 - Gateway route: GET /api/v1/previews/:previewId/\* -> boxTailIP:port.
 - Support WebSocket upgrades for HMR and dev servers.
-- Store routing metadata in DB/Redis to survive Fly.io reconnections.
+- Store routing metadata in DB/Redis to survive server reconnections.
 
 ## Voice Integration
 

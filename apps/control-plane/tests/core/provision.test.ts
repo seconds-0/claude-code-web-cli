@@ -10,7 +10,6 @@ describe("Provision core smoke tests", () => {
   describe("generateCloudInit produces valid output", () => {
     it("generates valid cloud-config YAML header", () => {
       const result = generateCloudInit({
-        tailscaleAuthKey: "test-key",
         hostname: "test-host",
       });
 
@@ -21,7 +20,6 @@ describe("Provision core smoke tests", () => {
     it("always includes ttyd start command", () => {
       // ttyd is the terminal service - if it doesn't start, terminal won't work
       const result = generateCloudInit({
-        tailscaleAuthKey: "test-key",
         hostname: "test-host",
       });
 
@@ -31,60 +29,57 @@ describe("Provision core smoke tests", () => {
     it("always signals provisioning complete", () => {
       // This marker file indicates successful provisioning
       const result = generateCloudInit({
-        tailscaleAuthKey: "test-key",
         hostname: "test-host",
       });
 
       expect(result).toContain("touch /var/run/ccc-provisioned");
     });
 
-    it("includes tailscale configuration", () => {
+    it("includes tailscale configuration when authKey provided", () => {
       const result = generateCloudInit({
         tailscaleAuthKey: "test-key",
         hostname: "test-host",
       });
 
-      // Tailscale command should be present (even if optional in direct mode)
+      // Tailscale commands should be present when key is provided
       expect(result).toContain("tailscale up");
       expect(result).toContain("test-key");
       expect(result).toContain("test-host");
     });
   });
 
-  describe("cloud-init handles both connection modes", () => {
-    it("direct connect mode skips Tailscale wait", () => {
+  describe("cloud-init handles Tailscale modes", () => {
+    it("skips Tailscale when no authKey provided (direct connect mode)", () => {
       const result = generateCloudInit({
-        tailscaleAuthKey: "test-key",
         hostname: "test-host",
-        privateMode: false,
+        // No tailscaleAuthKey = direct connect mode
       });
 
-      // Direct connect should NOT block waiting for Tailscale
-      expect(result).toContain("Tailscale optional in direct mode");
+      // Direct connect should show disabled message
+      expect(result).toContain("Tailscale disabled");
+      expect(result).not.toContain("tailscale up --authkey");
     });
 
-    it("private mode waits for Tailscale", () => {
+    it("configures Tailscale when authKey provided", () => {
       const result = generateCloudInit({
         tailscaleAuthKey: "test-key",
         hostname: "test-host",
-        privateMode: true,
       });
 
-      // Private mode should wait for Tailscale interface
+      // Should wait for Tailscale interface
       expect(result).toContain("for i in $(seq 1 30); do tailscale status");
     });
   });
 
-  describe("cloud-init includes network readiness check", () => {
-    it("waits for network before starting ttyd", () => {
+  describe("cloud-init security", () => {
+    it("warns when CONTROL_PLANE_IPS not configured", () => {
       const result = generateCloudInit({
-        tailscaleAuthKey: "test-key",
         hostname: "test-host",
+        // No controlPlaneIps = warning
       });
 
-      // Network check should be present
-      expect(result).toContain("Waiting for network interface");
-      expect(result).toContain("scope global");
+      expect(result).toContain("WARNING");
+      expect(result).toContain("ttyd");
     });
   });
 });

@@ -91,10 +91,10 @@ export default function WorkspaceActions({
         <button
           onClick={() => performAction("start")}
           disabled={isLoading !== null}
-          className="primary"
           style={{
             background: "var(--success)",
             borderColor: "var(--success)",
+            color: "var(--background)",
           }}
         >
           {isLoading === "start" ? <span className="loading-text">Starting</span> : "▶ Start"}

@@ -161,12 +161,159 @@ export const costSnapshots = pgTable(
   ]
 );
 
+// ============================================================================
+// BILLING SYSTEM TABLES
+// ============================================================================
+
+// Subscriptions table (Stripe subscription state)
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" })
+      .unique(),
+
+    // Stripe identifiers
+    stripeCustomerId: text("stripe_customer_id").notNull().unique(),
+    stripeSubscriptionId: text("stripe_subscription_id").unique(),
+
+    // Plan configuration (synced from Stripe price ID mapping)
+    plan: text("plan").notNull().default("free"), // free, starter, pro, unlimited, usage_based
+    status: text("status").notNull().default("active"), // active, past_due, canceled, paused, trialing, incomplete
+
+    // Overage settings (explicit opt-in)
+    overagesEnabled: boolean("overages_enabled").notNull().default(false),
+    overagesEnabledAt: timestamp("overages_enabled_at", { withTimezone: true }),
+    overagesPaymentMethodId: text("overages_payment_method_id"),
+
+    // Plan limits (NULL = unlimited, copied from PLAN_CONFIGS on sync)
+    computeMinutesLimit: integer("compute_minutes_limit"),
+    storageGbLimit: integer("storage_gb_limit"),
+    voiceSecondsLimit: integer("voice_seconds_limit"),
+
+    // Billing period (from Stripe, or virtual for free)
+    currentPeriodStart: timestamp("current_period_start", { withTimezone: true }).notNull(),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }).notNull(),
+
+    // Timestamps
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    canceledAt: timestamp("canceled_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("subscriptions_user_id_idx").on(table.userId),
+    index("subscriptions_stripe_customer_id_idx").on(table.stripeCustomerId),
+    index("subscriptions_status_idx").on(table.status),
+    index("subscriptions_period_end_idx").on(table.currentPeriodEnd),
+  ]
+);
+
+// Usage events (immutable event log for billing)
+export const usageEvents = pgTable(
+  "usage_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Relationships
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "set null" }),
+
+    // Event details
+    eventType: text("event_type").notNull(), // compute_minute, storage_gb_hour, voice_second
+    quantity: numeric("quantity", { precision: 12, scale: 6 }).notNull(),
+
+    // Billing context (denormalized for query performance)
+    billingPeriodStart: timestamp("billing_period_start", { withTimezone: true }).notNull(),
+    billingPeriodEnd: timestamp("billing_period_end", { withTimezone: true }).notNull(),
+
+    // Stripe sync status
+    stripeMeterEventId: text("stripe_meter_event_id"),
+    stripeSyncStatus: text("stripe_sync_status").notNull().default("pending"), // pending, synced, failed, not_required
+    stripeSyncAttempts: integer("stripe_sync_attempts").notNull().default(0),
+    stripeSyncError: text("stripe_sync_error"),
+    stripeSyncedAt: timestamp("stripe_synced_at", { withTimezone: true }),
+
+    // Timestamps
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
+
+    // Idempotency key prevents duplicates
+    idempotencyKey: text("idempotency_key").notNull().unique(),
+  },
+  (table) => [
+    index("usage_events_user_period_idx").on(
+      table.userId,
+      table.billingPeriodStart,
+      table.billingPeriodEnd
+    ),
+    index("usage_events_workspace_idx").on(table.workspaceId, table.recordedAt),
+    index("usage_events_type_period_idx").on(table.eventType, table.billingPeriodStart),
+    index("usage_events_stripe_pending_idx").on(table.stripeSyncStatus),
+  ]
+);
+
+// Processed webhooks (idempotency for Stripe webhooks)
+export const processedWebhooks = pgTable(
+  "processed_webhooks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    stripeEventId: text("stripe_event_id").notNull().unique(),
+    eventType: text("event_type").notNull(),
+    processedAt: timestamp("processed_at", { withTimezone: true }).defaultNow().notNull(),
+    // Auto-cleanup old entries (30 days)
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [index("processed_webhooks_expires_idx").on(table.expiresAt)]
+);
+
+// Billing alerts (notifications for usage limits, payment issues)
+export const billingAlerts = pgTable(
+  "billing_alerts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    alertType: text("alert_type").notNull(), // usage_50_percent, usage_80_percent, usage_100_percent, payment_failed, etc.
+    resourceType: text("resource_type"), // compute, storage, voice (null for non-usage alerts)
+    message: text("message").notNull(),
+    metadata: text("metadata"), // JSON string for additional data
+
+    // Billing period this alert is for (prevents duplicates per period)
+    billingPeriodStart: timestamp("billing_period_start", { withTimezone: true }).notNull(),
+
+    // Delivery status
+    emailSent: boolean("email_sent").default(false),
+    emailSentAt: timestamp("email_sent_at", { withTimezone: true }),
+    inAppDismissed: boolean("in_app_dismissed").default(false),
+    inAppDismissedAt: timestamp("in_app_dismissed_at", { withTimezone: true }),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("billing_alerts_user_idx").on(table.userId, table.createdAt),
+    uniqueIndex("billing_alerts_unique_idx").on(
+      table.userId,
+      table.alertType,
+      table.resourceType,
+      table.billingPeriodStart
+    ),
+  ]
+);
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   workspaces: many(workspaces),
   anthropicCredential: one(anthropicCredentials),
   costEvents: many(costEvents),
   costSnapshots: many(costSnapshots),
+  subscription: one(subscriptions),
+  usageEvents: many(usageEvents),
+  billingAlerts: many(billingAlerts),
 }));
 
 export const anthropicCredentialsRelations = relations(anthropicCredentials, ({ one }) => ({
@@ -226,6 +373,32 @@ export const costSnapshotsRelations = relations(costSnapshots, ({ one }) => ({
   }),
   user: one(users, {
     fields: [costSnapshots.userId],
+    references: [users.id],
+  }),
+}));
+
+// Billing system relations
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  user: one(users, {
+    fields: [subscriptions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const usageEventsRelations = relations(usageEvents, ({ one }) => ({
+  user: one(users, {
+    fields: [usageEvents.userId],
+    references: [users.id],
+  }),
+  workspace: one(workspaces, {
+    fields: [usageEvents.workspaceId],
+    references: [workspaces.id],
+  }),
+}));
+
+export const billingAlertsRelations = relations(billingAlerts, ({ one }) => ({
+  user: one(users, {
+    fields: [billingAlerts.userId],
     references: [users.id],
   }),
 }));

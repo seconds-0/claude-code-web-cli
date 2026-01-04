@@ -31,9 +31,8 @@ import { generateCaptureToken, getTokensForUser } from "../../routes/anthropic.j
 import type { TokenBlob } from "../../services/encryption.js";
 
 // Cloud-init template for user boxes
-// Exported for testing
 export function generateCloudInit(params: {
-  tailscaleAuthKey: string;
+  tailscaleAuthKey?: string; // Optional - Tailscale currently disabled
   hostname: string;
   volumeDevice?: string;
   sshPublicKey?: string;
@@ -45,8 +44,6 @@ export function generateCloudInit(params: {
   apiUrl?: string;
   // Control plane IPs for firewall allowlist (space-separated)
   controlPlaneIps?: string;
-  // Private mode - if false, direct connect is used and Tailscale wait is optional
-  privateMode?: boolean;
 }): string {
   const {
     tailscaleAuthKey,
@@ -57,7 +54,6 @@ export function generateCloudInit(params: {
     captureToken,
     apiUrl,
     controlPlaneIps,
-    privateMode = false,
   } = params;
 
   // Generate Claude credentials injection if user has tokens
@@ -101,21 +97,13 @@ ${credentialsJson
       : "";
 
   // Generate firewall configuration block if control plane IPs are provided
-  // Uses inline iptables rules instead of external script for reliability
   const firewallBlock = controlPlaneIps
     ? `
   # Configure ttyd firewall to restrict access to control plane only
   - |
-    echo "Configuring ttyd firewall with inline iptables..."
-    # Drop all traffic to ttyd port by default
-    iptables -A INPUT -p tcp --dport 7681 -j DROP
-    # Allow traffic from specified control plane IPs
-    for ip in ${controlPlaneIps}; do
-      iptables -I INPUT -p tcp --dport 7681 -s "$ip" -j ACCEPT
-      echo "Allowed ttyd access from $ip"
-    done
-    # Also allow localhost for debugging
-    iptables -I INPUT -p tcp --dport 7681 -s 127.0.0.1 -j ACCEPT
+    echo "Configuring ttyd firewall..."
+    export CONTROL_PLANE_IPS="${controlPlaneIps}"
+    /usr/local/bin/configure-ttyd-firewall.sh || echo "WARNING: Firewall configuration failed"
   `
     : `
   # WARNING: CONTROL_PLANE_IPS not set - ttyd accessible from any IP
@@ -140,18 +128,14 @@ users:
     : ""
 }
 runcmd:
-  # Connect to Tailscale (non-blocking in direct connect mode)
   ${
-    privateMode
-      ? `
+    tailscaleAuthKey
+      ? `# Connect to Tailscale
   - tailscale up --authkey=${tailscaleAuthKey} --hostname=${hostname}
-  # Wait for Tailscale interface in private mode (required for connectivity)
-  - for i in $(seq 1 30); do tailscale status && break || sleep 2; done
-  `
-      : `
-  # Direct connect mode: start Tailscale but don't wait - we have public IP
-  - tailscale up --authkey=${tailscaleAuthKey} --hostname=${hostname} || echo "Tailscale optional in direct mode"
-  `
+  # Wait for Tailscale interface to be ready
+  - for i in $(seq 1 30); do tailscale status && break || sleep 2; done`
+      : `# Tailscale disabled - using public IP directly
+  - echo "Tailscale disabled - using public IP for terminal access"`
   }
 
   # Mount persistent volume if attached
@@ -166,30 +150,9 @@ runcmd:
   }
 ${claudeCredsBlock}
 ${captureTokenBlock}
-  # Wait for network interface to be ready before starting ttyd
-  - |
-    echo "Waiting for network interface..."
-    for i in $(seq 1 30); do
-      if ip addr show | grep -q 'scope global'; then
-        echo "Network interface ready"
-        break
-      fi
-      sleep 1
-    done
 ${firewallBlock}
   # Start ttyd terminal service
   - systemctl start ttyd
-
-  # Verify ttyd is running
-  - |
-    sleep 2
-    if systemctl is-active --quiet ttyd; then
-      echo "ttyd started successfully"
-    else
-      echo "ttyd failed to start, checking status..."
-      systemctl status ttyd || true
-      journalctl -u ttyd --no-pager -n 20 || true
-    fi
 
   # Signal that provisioning is complete
   - touch /var/run/ccc-provisioned
@@ -254,16 +217,17 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
       .set({ status: "starting", startedAt: new Date() })
       .where(eq(workspaceInstances.workspaceId, workspaceId));
 
-    // Step 2: Create Tailscale auth key
-    // Note: Tags require ACL configuration in Tailscale - omitting for now
-    console.log(`[provision] Creating Tailscale auth key`);
-    const authKey = await tailscale.createAuthKey({
-      description: `ccc-workspace-${workspaceId}`,
-      expirySeconds: 3600, // 1 hour
-      ephemeral: true,
-      preauthorized: true,
-    });
-    console.log(`[provision] Created Tailscale auth key: ${authKey.id}`);
+    // Step 2: Tailscale auth key - DISABLED
+    //
+    // TODO: IMPLEMENT TAILSCALE AS OPT-IN FEATURE
+    // Currently disabled for fast provisioning. Future implementation:
+    // - Add workspace.useTailscale boolean field
+    // - If enabled, create auth key and wait for device
+    // - If disabled (default), use public IP directly
+    // - Let users opt-in via workspace settings for extra security
+    //
+    // const authKey = await tailscale.createAuthKey({...});
+    console.log(`[provision] Tailscale disabled - using public IP for fast provisioning`);
 
     // Step 3: Create or verify Hetzner volume
     if (!workspace.volume?.hetznerVolumeId) {
@@ -338,7 +302,7 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
     }
 
     const cloudInit = generateCloudInit({
-      tailscaleAuthKey: authKey.key,
+      // tailscaleAuthKey omitted - Tailscale currently disabled
       hostname,
       volumeDevice,
       sshPublicKey: process.env["SSH_PUBLIC_KEY"],
@@ -346,7 +310,6 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
       captureToken,
       apiUrl,
       controlPlaneIps: process.env["CONTROL_PLANE_IPS"],
-      privateMode: workspace.privateMode,
     });
 
     const serverResult = await hetzner.createServer({
@@ -389,27 +352,20 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
     });
     console.log(`[provision] Recorded server start cost event`);
 
-    // Step 7: Wait for Tailscale device (optional for direct connect mode)
-    // If we have a public IP, we can use direct connect and Tailscale is not required
-    let tailscaleIp: string | null = null;
-    console.log(`[provision] Waiting for Tailscale device (optional, have public IP: ${publicIp})`);
-    try {
-      tailscaleDevice = await tailscale.waitForDevice(hostname, {
-        timeoutMs: publicIp ? 60_000 : 180_000, // Shorter timeout if we have direct connect
-        pollIntervalMs: 5000,
-      });
-      tailscaleIp = tailscale.getDeviceIp(tailscaleDevice);
-      console.log(`[provision] Tailscale device connected: ${tailscaleDevice.id} (${tailscaleIp})`);
-    } catch (tailscaleError) {
-      if (publicIp) {
-        console.warn(
-          `[provision] Tailscale device did not appear, but direct connect available via ${publicIp}`
-        );
-      } else {
-        // No public IP and no Tailscale - this is a real failure
-        throw tailscaleError;
-      }
-    }
+    // Step 7: Tailscale disabled - default to public IP for fast provisioning
+    //
+    // TODO: IMPLEMENT TAILSCALE AS OPT-IN FEATURE
+    // Tailscale should be an optional security feature users can enable:
+    // - Add useTailscale boolean to workspace settings
+    // - If enabled: create auth key, configure cloud-init, wait for device
+    // - If disabled (default): use public IP directly (current behavior)
+    // Benefits of Tailscale when enabled:
+    // - Private network between control plane and user boxes
+    // - NAT traversal for users behind strict firewalls
+    // - Encrypted tunnel without exposing ttyd on public IP
+    //
+    const tailscaleIp: string | null = null;
+    console.log(`[provision] Using public IP for terminal access: ${publicIp}`);
 
     // Step 8: Update database with final state
     await db
@@ -425,9 +381,7 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
       .set({ status: "ready", updatedAt: new Date() })
       .where(eq(workspaces.id, workspaceId));
 
-    console.log(
-      `[provision] Workspace ${workspaceId} provisioned successfully (direct: ${!!publicIp}, tailscale: ${!!tailscaleIp})`
-    );
+    console.log(`[provision] Workspace ${workspaceId} provisioned successfully`);
   } catch (error) {
     console.error(`[provision] Error provisioning workspace ${workspaceId}:`, error);
 
@@ -448,11 +402,11 @@ export async function handleProvisionJob(job: ProvisionJob): Promise<void> {
         console.log(`[provision] Cleaning up server ${hetznerServer.id}`);
         await hetzner.deleteServer(hetznerServer.id);
       }
-      // Use type assertion to help TypeScript understand tailscaleDevice may have been assigned
-      const deviceToCleanup = tailscaleDevice as TailscaleDevice | null;
-      if (deviceToCleanup) {
-        console.log(`[provision] Cleaning up Tailscale device ${deviceToCleanup.id}`);
-        await tailscale.deleteDevice(deviceToCleanup.id);
+      // Type assertion needed due to TypeScript control flow limitations with nested try-catch
+      const tsDevice = tailscaleDevice as TailscaleDevice | null;
+      if (tsDevice?.id) {
+        console.log(`[provision] Cleaning up Tailscale device ${tsDevice.id}`);
+        await tailscale.deleteDevice(tsDevice.id);
       }
     } catch (cleanupError) {
       console.error(`[provision] Error during cleanup:`, cleanupError);

@@ -8,7 +8,9 @@ import { workspacesRoute } from "./routes/workspaces.js";
 import { usersRoute } from "./routes/users.js";
 import { anthropicRoute } from "./routes/anthropic.js";
 import { costsRoute } from "./routes/costs.js";
-import { adminRoute } from "./routes/admin.js";
+import { stripeWebhooksRoute } from "./routes/stripe-webhooks.js";
+import { billingJobsRoute } from "./routes/billing-jobs.js";
+import { billingRoute } from "./routes/billing.js";
 
 // Create the main app
 export const app = new Hono();
@@ -22,15 +24,13 @@ app.use(
     origin: (origin) => {
       // Allow any localhost port for development
       if (origin && /^http:\/\/localhost:\d+$/.test(origin)) return origin;
-      // Allow specific Vercel preview/production URLs
-      // In production, set ALLOWED_ORIGINS env var
+      // Production: ALLOWED_ORIGINS should be set to your custom domain(s)
+      // This takes precedence and is the recommended approach for production
       const allowedOrigins = process.env["ALLOWED_ORIGINS"]?.split(",") ?? [];
-      if (allowedOrigins.includes(origin)) return origin;
-      // Allow Vercel preview deployments (validate pattern properly)
-      if (origin && /^https:\/\/[\w-]+-[\w-]+\.vercel\.app$/.test(origin)) {
-        return origin;
-      }
-      // Allow Railway deployments (*.up.railway.app)
+      if (origin && allowedOrigins.includes(origin)) return origin;
+      // Allow Railway preview deployments (*.up.railway.app)
+      // Note: This is permissive for development convenience. In production,
+      // set ALLOWED_ORIGINS to your specific domain(s) for tighter security.
       if (origin && /^https:\/\/[\w-]+\.up\.railway\.app$/.test(origin)) {
         return origin;
       }
@@ -47,7 +47,9 @@ app.route("/api/v1/workspaces", workspacesRoute);
 app.route("/api/v1/users", usersRoute);
 app.route("/api/v1/anthropic", anthropicRoute);
 app.route("/api/v1/costs", costsRoute);
-app.route("/api/v1/admin", adminRoute);
+app.route("/webhooks/stripe", stripeWebhooksRoute);
+app.route("/jobs", billingJobsRoute);
+app.route("/api/v1/billing", billingRoute);
 
 // 404 handler
 app.notFound((c) => {

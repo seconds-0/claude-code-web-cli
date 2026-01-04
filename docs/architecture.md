@@ -36,7 +36,7 @@ Backup/Export (R2 via S3 API tokens)
 - ORM and migrations: Drizzle ORM + drizzle-kit.
 - Auth: Clerk (JWT verification via backend/JWKS).
 - Billing: Stripe subscriptions + Billing Meters.
-- Hosting: Fly.io (gateway) and Vercel (web).
+- Hosting: Railway (all services).
 
 ## Data Plane (User Compute)
 
