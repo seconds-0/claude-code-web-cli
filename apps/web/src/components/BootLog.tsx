@@ -103,13 +103,18 @@ export default function BootLog({
         await fetchRuntimeConfig();
         const token = await getToken();
 
+        // Check for valid auth token
+        if (!token) {
+          throw new Error("Authentication required. Please sign in again.");
+        }
+
         // If already starting, just begin polling without calling start API
         if (isAlreadyStarting && !canStart) {
           if (!isMounted.current) return; // Don't start polling if unmounted
           setPhase("provisioning");
           addLog("Resuming workspace startup...");
           setProgress(30);
-          startPolling(token!);
+          startPolling(token);
           return;
         }
 
@@ -138,7 +143,7 @@ export default function BootLog({
 
         // Start polling for status
         if (isMounted.current) {
-          startPolling(token!);
+          startPolling(token);
         }
       } catch (err) {
         updateLastLog({ status: "error" });
@@ -161,6 +166,8 @@ export default function BootLog({
     (token: string) => {
       let instanceStarted = false;
       let networkConfigured = false;
+      let consecutiveFailures = 0;
+      const MAX_FAILURES = 5;
 
       pollInterval.current = setInterval(async () => {
         // Stop polling if component unmounted
@@ -177,7 +184,32 @@ export default function BootLog({
             cache: "no-store",
           });
 
-          if (!res.ok) return;
+          if (!res.ok) {
+            consecutiveFailures++;
+            // Handle auth errors immediately
+            if (res.status === 401 || res.status === 403) {
+              if (pollInterval.current) {
+                clearInterval(pollInterval.current);
+                pollInterval.current = null;
+              }
+              setError("Session expired. Please refresh the page.");
+              setPhase("error");
+              return;
+            }
+            // After multiple failures, show error
+            if (consecutiveFailures >= MAX_FAILURES) {
+              if (pollInterval.current) {
+                clearInterval(pollInterval.current);
+                pollInterval.current = null;
+              }
+              setError("Failed to check workspace status. Please try again.");
+              setPhase("error");
+            }
+            return;
+          }
+
+          // Reset failure counter on success
+          consecutiveFailures = 0;
 
           const data = await res.json();
           const instanceStatus = data.instance?.status;

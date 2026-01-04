@@ -84,8 +84,13 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
     notFound();
   }
 
-  // shouldAutoStart: only for pending workspaces (first-time setup) - prevents auto-restart after user stops
-  const shouldAutoStart = workspace.status === "pending";
+  // shouldAutoStart: only for pending workspaces with no instance in progress
+  // Prevents double /start calls when instance is already being provisioned
+  const shouldAutoStart =
+    workspace.status === "pending" &&
+    (!workspace.instance ||
+      workspace.instance.status === "stopped" ||
+      !["pending", "starting", "running"].includes(workspace.instance.status));
   // canStart: includes stopped/suspended for manual restart via Start button
   const canStart =
     workspace.status === "suspended" ||
