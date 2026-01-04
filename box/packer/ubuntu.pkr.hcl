@@ -15,7 +15,7 @@ variable "hcloud_token" {
 
 variable "location" {
   type    = string
-  default = "nbg1"
+  default = "ash"  # Ashburn, VA - EU locations deprecated for cpx11 as of 2025-12-31
 }
 
 variable "server_type" {
