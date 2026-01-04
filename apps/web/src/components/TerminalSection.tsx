@@ -1,7 +1,10 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import Terminal from "./Terminal";
+import Terminal, { type XTerminalHandle } from "./Terminal";
+import MobileToolbar from "./MobileToolbar";
+import { useVisualViewport } from "@/hooks/useVisualViewport";
+import { useTouchDevice } from "@/hooks/useTouchDevice";
 
 interface TerminalSectionProps {
   workspaceId: string;
@@ -18,6 +21,11 @@ export default function TerminalSection({
 }: TerminalSectionProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [terminalHandle, setTerminalHandle] = useState<XTerminalHandle | null>(null);
+
+  // Mobile support hooks
+  const { height: viewportHeight, isKeyboardOpen } = useVisualViewport();
+  const isTouchDevice = useTouchDevice();
 
   const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
@@ -87,12 +95,23 @@ export default function TerminalSection({
       <div
         className="terminal-screen"
         style={{
-          height: isFullscreen ? "calc(100vh - 40px)" : "calc(100vh - 320px)",
-          minHeight: isFullscreen ? undefined : "400px",
+          // Use visual viewport height for mobile keyboard support
+          // Clamp to minimum 200px to prevent negative/tiny heights on small screens or landscape
+          height: isFullscreen
+            ? "calc(100vh - 40px)"
+            : isTouchDevice && viewportHeight > 0
+              ? `${Math.max(viewportHeight - 320 - 64, 200)}px` // Account for header (~40px) + toolbar (64px) + margins
+              : "calc(100vh - 320px)",
+          minHeight: isFullscreen ? undefined : "200px",
+          transition: isKeyboardOpen ? "none" : "height 0.1s ease", // Smooth except when keyboard animating
         }}
       >
         {isReady && ipAddress ? (
-          <Terminal workspaceId={workspaceId} ipAddress={ipAddress} />
+          <Terminal
+            workspaceId={workspaceId}
+            ipAddress={ipAddress}
+            onTerminalReady={setTerminalHandle}
+          />
         ) : (
           <div
             style={{
@@ -129,6 +148,26 @@ export default function TerminalSection({
           </div>
         )}
       </div>
+
+      {/* Mobile command toolbar - only shown on touch devices when terminal is ready */}
+      {/* Note: Don't call focus() here - it would summon the virtual keyboard on every button press,
+          making it impossible to use arrow keys for navigation without the keyboard taking up half the screen.
+          The buttons use onPointerDown + preventDefault to keep focus state as-is. */}
+      {isTouchDevice && isReady && ipAddress && terminalHandle && (
+        <MobileToolbar
+          onKeyPress={(key) => terminalHandle.sendKey(key)}
+          onPaste={async () => {
+            try {
+              const text = await navigator.clipboard.readText();
+              if (text) {
+                terminalHandle.sendKey(text);
+              }
+            } catch (err) {
+              console.warn("[TerminalSection] Clipboard read failed:", err);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

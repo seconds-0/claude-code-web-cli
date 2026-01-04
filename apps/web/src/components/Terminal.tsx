@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
 import dynamic from "next/dynamic";
 import { getApiUrl, fetchRuntimeConfig } from "@/lib/config";
+import type { XTerminalHandle } from "./XTerminal";
 
 // Dynamically import XTerminal to avoid SSR issues with xterm.js
 const XTerminal = dynamic(() => import("./XTerminal"), {
@@ -26,6 +27,7 @@ const XTerminal = dynamic(() => import("./XTerminal"), {
 interface TerminalProps {
   workspaceId: string;
   ipAddress: string;
+  onTerminalReady?: (handle: XTerminalHandle) => void;
 }
 
 // Connection info - either direct connect URL or relay session token
@@ -35,7 +37,7 @@ interface ConnectionInfo {
   expiresAt?: string;
 }
 
-export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
+export default function Terminal({ workspaceId, ipAddress, onTerminalReady }: TerminalProps) {
   const { getToken } = useAuth();
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -229,6 +231,10 @@ export default function Terminal({ workspaceId, ipAddress }: TerminalProps) {
       onConnect={() => console.log(`Terminal connected via ${connectionInfo.mode}`)}
       onDisconnect={() => console.log("Terminal disconnected")}
       onError={(err) => setError(err)}
+      onReady={onTerminalReady}
     />
   );
 }
+
+// Re-export type for consumers
+export type { XTerminalHandle };

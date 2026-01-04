@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from "react";
 import type { Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
 import type { WebglAddon } from "@xterm/addon-webgl";
@@ -14,6 +14,14 @@ interface XTerminalProps {
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: string) => void;
+  onReady?: (handle: XTerminalHandle) => void; // Called when terminal is ready for external control
+}
+
+// Exposed methods for external control (e.g., mobile toolbar)
+export interface XTerminalHandle {
+  sendKey: (key: string) => void;
+  focus: () => void;
+  fit: () => void;
 }
 
 // Connection states
@@ -39,14 +47,10 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T 
 // Module-level tracking to prevent StrictMode double-init race conditions
 const initializedContainers = new WeakSet<HTMLElement>();
 
-export default function XTerminal({
-  workspaceId,
-  wsUrl,
-  connectionMode,
-  onConnect,
-  onDisconnect,
-  onError,
-}: XTerminalProps) {
+const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(function XTerminal(
+  { workspaceId, wsUrl, connectionMode, onConnect, onDisconnect, onError, onReady },
+  ref
+) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -69,6 +73,24 @@ export default function XTerminal({
 
   const MAX_RECONNECT_ATTEMPTS = 5;
   const RECONNECT_DELAY_MS = 2000;
+
+  // Create handle object for external control (e.g., mobile toolbar)
+  const handleRef = useRef<XTerminalHandle>({
+    sendKey: (key: string) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send("0" + key);
+      }
+    },
+    focus: () => {
+      xtermRef.current?.focus();
+    },
+    fit: () => {
+      fitAddonRef.current?.fit();
+    },
+  });
+
+  // Expose methods via ref (for forwardRef usage)
+  useImperativeHandle(ref, () => handleRef.current, []);
 
   // Build the full WebSocket URL
   // For relay mode, wsUrl is relative (e.g., /ws/terminal?token=...) so we need to prepend the base
@@ -274,7 +296,7 @@ export default function XTerminal({
       term = new Terminal({
         cursorBlink: false, // Saves periodic renders
         cursorStyle: "block",
-        fontSize: 14,
+        fontSize: 16, // 16px minimum prevents iOS Safari zoom on focus
         lineHeight: 1.2,
         fontFamily: "'JetBrains Mono', 'SF Mono', 'Menlo', monospace",
         scrollback: 2000, // ~12MB memory, practical history
@@ -362,13 +384,16 @@ export default function XTerminal({
         // Ctrl+V conflicts with terminal escape sequences, so we intercept it
         if (event.ctrlKey && event.key.toLowerCase() === "v" && !event.metaKey) {
           event.preventDefault();
-          navigator.clipboard.readText().then((text) => {
-            if (text && wsRef.current?.readyState === WebSocket.OPEN) {
-              wsRef.current.send("0" + text);
-            }
-          }).catch((err) => {
-            console.warn("[XTerminal] Clipboard paste failed:", err);
-          });
+          navigator.clipboard
+            .readText()
+            .then((text) => {
+              if (text && wsRef.current?.readyState === WebSocket.OPEN) {
+                wsRef.current.send("0" + text);
+              }
+            })
+            .catch((err) => {
+              console.warn("[XTerminal] Clipboard paste failed:", err);
+            });
           return false; // Don't let xterm handle Ctrl+V
         }
 
@@ -426,23 +451,29 @@ export default function XTerminal({
       xtermRef.current = term;
       fitAddonRef.current = fitAddon;
 
+      // Notify parent that terminal is ready for external control
+      onReady?.(handleRef.current);
+
       // Connect after terminal is ready
       connect();
     };
 
     initTerminal();
 
-    // Handle window resize with debouncing to avoid excessive fit() calls
+    // Use ResizeObserver instead of window resize for iOS compatibility
+    // iOS doesn't fire window resize when virtual keyboard opens
     const debouncedFit = debounce(() => {
-      if (fitAddonRef.current) {
-        fitAddonRef.current.fit();
-      }
-    }, 100);
+      fitAddonRef.current?.fit();
+    }, 50);
 
-    window.addEventListener("resize", debouncedFit);
+    let resizeObserver: ResizeObserver | null = null;
+    if (terminalRef.current) {
+      resizeObserver = new ResizeObserver(debouncedFit);
+      resizeObserver.observe(terminalRef.current);
+    }
 
     return () => {
-      window.removeEventListener("resize", debouncedFit);
+      resizeObserver?.disconnect();
 
       // Cleanup reconnect timeout
       if (reconnectTimeoutRef.current) {
@@ -485,6 +516,34 @@ export default function XTerminal({
         initializedContainers.delete(terminalRef.current);
       }
     };
+  }, [connect]);
+
+  // Handle visibility changes for mobile (reconnect when app resumes)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // App has become visible again
+        const wsState = wsRef.current?.readyState;
+
+        // Only reconnect if socket is closed or doesn't exist
+        // Guard against CONNECTING (0) or CLOSING (2) states to prevent duplicate connections
+        if (wsState === undefined || wsState === WebSocket.CLOSED) {
+          console.log("[XTerminal] App resumed - reconnecting");
+          // Clear any pending reconnect timeout to prevent duplicate attempts
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
+          }
+          reconnectAttemptRef.current = 0;
+          connect();
+        }
+        // Re-fit terminal in case dimensions changed while backgrounded
+        fitAddonRef.current?.fit();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [connect]);
 
   // Status indicator
@@ -611,4 +670,6 @@ export default function XTerminal({
       />
     </div>
   );
-}
+});
+
+export default XTerminal;

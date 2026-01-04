@@ -29,6 +29,12 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+        <head>
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+          />
+        </head>
         <body>{children}</body>
       </html>
     </ClerkProvider>
