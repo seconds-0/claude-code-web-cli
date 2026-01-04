@@ -76,6 +76,30 @@ export default function XTerminal({
   const fullWsUrl =
     wsUrl.startsWith("wss://") || wsUrl.startsWith("ws://") ? wsUrl : `${getWsUrl()}${wsUrl}`;
 
+  // Send input to terminal (called by accessory bar via custom event)
+  const sendInput = useCallback((data: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      // ttyd input protocol: '0' prefix + data as text
+      wsRef.current.send("0" + data);
+    }
+  }, []);
+
+  // Listen for accessory bar input events
+  useEffect(() => {
+    const handleAccessoryInput = (event: Event) => {
+      const customEvent = event as CustomEvent<{ workspaceId: string; key: string }>;
+      // Only handle events for this workspace
+      if (customEvent.detail.workspaceId === workspaceId) {
+        sendInput(customEvent.detail.key);
+      }
+    };
+
+    window.addEventListener("terminal-input", handleAccessoryInput);
+    return () => {
+      window.removeEventListener("terminal-input", handleAccessoryInput);
+    };
+  }, [workspaceId, sendInput]);
+
   // Connect to WebSocket
   const connect = useCallback(async () => {
     if (!xtermRef.current) return;
