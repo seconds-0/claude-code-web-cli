@@ -36,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider afterSignUpUrl="/dashboard/setup" afterSignInUrl="/dashboard">
       <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
         <body>{children}</body>
       </html>
