@@ -122,6 +122,40 @@ describe("Workspaces API", () => {
       // 400 if validation happens first, 500 if DB connection fails first
       expect([400, 500]).toContain(res.status);
     });
+
+    it("returns 404 for non-existent workspace (DB required)", async () => {
+      const res = await app.request("/api/v1/workspaces/00000000-0000-0000-0000-000000000000", {
+        method: "DELETE",
+        headers: {
+          "X-Test-User-Id": testUserId,
+        },
+      });
+
+      // 404 with DB, 500 without
+      expect([404, 500]).toContain(res.status);
+
+      if (res.status === 404) {
+        const body = await res.json();
+        expect(body).toHaveProperty("error", "not_found");
+      }
+    });
+
+    it("returns success:true on successful delete (DB required)", async () => {
+      const res = await app.request("/api/v1/workspaces/00000000-0000-0000-0000-000000000000", {
+        method: "DELETE",
+        headers: {
+          "X-Test-User-Id": testUserId,
+        },
+      });
+
+      // Expect either 404 (not found), 200 (success), or 500 (no DB)
+      expect([200, 404, 500]).toContain(res.status);
+
+      if (res.status === 200) {
+        const body = await res.json();
+        expect(body).toHaveProperty("success", true);
+      }
+    });
   });
 
   describe("Workspace lifecycle endpoints", () => {

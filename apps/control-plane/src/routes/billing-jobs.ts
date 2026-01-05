@@ -30,14 +30,13 @@ const QSTASH_CURRENT_SIGNING_KEY = process.env["QSTASH_CURRENT_SIGNING_KEY"];
 const QSTASH_NEXT_SIGNING_KEY = process.env["QSTASH_NEXT_SIGNING_KEY"];
 const IS_PRODUCTION = process.env["NODE_ENV"] === "production";
 
-// Validate QStash configuration at startup in production
-// This fails fast rather than silently rejecting all billing jobs
+// Warn if QStash configuration is missing in production
+// Billing jobs will fail individually when called, but app should still start
 if (IS_PRODUCTION && !QSTASH_CURRENT_SIGNING_KEY && !QSTASH_NEXT_SIGNING_KEY) {
-  const errorMsg =
-    "FATAL: QStash signing keys not configured in production. " +
-    "All billing jobs will fail. Set QSTASH_CURRENT_SIGNING_KEY or QSTASH_NEXT_SIGNING_KEY.";
-  console.error(errorMsg);
-  throw new Error(errorMsg);
+  console.warn(
+    "WARNING: QStash signing keys not configured in production. " +
+      "Billing jobs will reject all requests until QSTASH_CURRENT_SIGNING_KEY or QSTASH_NEXT_SIGNING_KEY is set."
+  );
 }
 
 // Initialize QStash Receiver for signature verification

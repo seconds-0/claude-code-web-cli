@@ -41,6 +41,7 @@ export const workspaceInstanceSchema = z.object({
   id: uuidSchema,
   workspaceId: uuidSchema,
   hetznerServerId: z.string().nullable(),
+  publicIp: z.string().nullable(),
   tailscaleIp: z.string().nullable(),
   status: instanceStatusSchema,
   startedAt: timestampSchema.nullable(),

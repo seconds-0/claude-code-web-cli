@@ -3,6 +3,10 @@ import { createDb } from "@ccc/db";
 // Singleton database instance
 let db: ReturnType<typeof createDb> | null = null;
 
+export function isDbConfigured(): boolean {
+  return !!process.env["DATABASE_URL"];
+}
+
 export function getDb() {
   if (!db) {
     const url = process.env["DATABASE_URL"];
