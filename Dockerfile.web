@@ -28,8 +28,14 @@ ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_CONTROL_PLANE_URL=${NEXT_PUBLIC_CONTROL_PLANE_URL}
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
 
-# Build
-RUN echo "Building with NEXT_PUBLIC_CONTROL_PLANE_URL=${NEXT_PUBLIC_CONTROL_PLANE_URL}" && \
+# Remove any .env files that might have been copied (belt and suspenders)
+RUN rm -f /app/.env* /app/apps/web/.env* 2>/dev/null || true
+
+# Build - log the Clerk key prefix to verify correct value is being used
+RUN echo "=== BUILD ARGS ===" && \
+    echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY prefix: $(echo $NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY | cut -c1-20)..." && \
+    echo "NEXT_PUBLIC_CONTROL_PLANE_URL: ${NEXT_PUBLIC_CONTROL_PLANE_URL}" && \
+    echo "=================" && \
     pnpm turbo run build --filter=@ccc/web
 
 # Production stage
