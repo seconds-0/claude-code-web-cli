@@ -1,6 +1,8 @@
+# Dockerfile path is set via RAILWAY_DOCKERFILE_PATH env var per service:
+# - web: Dockerfile.web
+# - control-plane: Dockerfile
 [build]
 builder = "dockerfile"
-dockerfilePath = "Dockerfile"
 
 [deploy]
 healthcheckPath = "/api/v1/health"
