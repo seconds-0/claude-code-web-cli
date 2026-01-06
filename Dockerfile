@@ -1,15 +1,14 @@
 # Build stage
 FROM node:20-slim AS builder
 
-# Install pnpm
-RUN npm install -g pnpm@9.15.0
+# Enable pnpm via corepack (built into Node.js 16+, more memory-efficient)
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
 WORKDIR /app
 
 # Copy package files for workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/control-plane/package.json ./apps/control-plane/
-COPY packages/db/package.json ./packages/db/
+COPY apps/web/package.json ./apps/web/
 COPY packages/api-contract/package.json ./packages/api-contract/
 COPY packages/config/package.json ./packages/config/
 
@@ -18,42 +17,43 @@ RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY packages/ ./packages/
-COPY apps/control-plane/ ./apps/control-plane/
+COPY apps/web/ ./apps/web/
 COPY turbo.json ./
 
-# Build
-RUN pnpm turbo run build --filter=@ccc/control-plane
+# Build arguments - Railway passes env vars as build args automatically
+ARG NEXT_PUBLIC_CONTROL_PLANE_URL
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
+# Make them available as env vars during build (required for Next.js)
+ENV NEXT_PUBLIC_CONTROL_PLANE_URL=${NEXT_PUBLIC_CONTROL_PLANE_URL}
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+
+# Remove any .env files that might have been copied (belt and suspenders)
+RUN rm -f /app/.env* /app/apps/web/.env* 2>/dev/null || true
+
+# Build - log the Clerk key prefix to verify correct value is being used
+RUN echo "=== BUILD ARGS ===" && \
+    echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY prefix: $(echo $NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY | cut -c1-20)..." && \
+    echo "NEXT_PUBLIC_CONTROL_PLANE_URL: ${NEXT_PUBLIC_CONTROL_PLANE_URL}" && \
+    echo "=================" && \
+    pnpm turbo run build --filter=@ccc/web
 
 # Production stage
 FROM node:20-slim AS runner
 
 WORKDIR /app
 
-# Install Tailscale for connecting to VMs over private network
-RUN apt-get update && apt-get install -y curl ca-certificates iptables && \
-    curl -fsSL https://tailscale.com/install.sh | sh && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Create directory for Tailscale state
-RUN mkdir -p /var/lib/tailscale
-
-# Copy built artifacts and dependencies
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/control-plane/node_modules ./apps/control-plane/node_modules
-COPY --from=builder /app/apps/control-plane/dist ./apps/control-plane/dist
-COPY --from=builder /app/apps/control-plane/package.json ./apps/control-plane/
-COPY --from=builder /app/packages ./packages
-
-# Copy startup script
-COPY apps/control-plane/start.sh ./start.sh
-RUN chmod +x ./start.sh
+# Copy built artifacts
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
 
 ENV NODE_ENV=production
-ENV PORT=3001
-# Cache bust: 2026-01-04-v2
-ENV CACHE_BUST=v2
+# Let Railway set PORT; set HOSTNAME to bind all interfaces
+ENV HOSTNAME=0.0.0.0
 
-EXPOSE 3001
+# Default port for local testing only
+EXPOSE 3000
 
-# Use startup script that initializes Tailscale before starting the app
-CMD ["./start.sh"]
+# Standalone preserves monorepo structure, server.js is at apps/web/
+CMD ["node", "/app/apps/web/server.js"]
