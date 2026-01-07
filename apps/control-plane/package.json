@@ -11,6 +11,7 @@
     "lint": "eslint src/",
     "test": "vitest run",
     "test:core": "vitest run tests/core/",
+    "test:e2e": "vitest run tests/e2e/",
     "test:watch": "vitest"
   },
   "dependencies": {
