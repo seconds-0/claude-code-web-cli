@@ -27,7 +27,9 @@ export default function SignInPage() {
       }
 
       // Get text up to cursor position
-      const text = input.value.substring(0, input.selectionStart || 0);
+      // Note: selectionStart is null for type="email" inputs in browsers
+      const cursorPos = input.selectionStart ?? input.value.length;
+      const text = input.value.substring(0, cursorPos);
 
       // Copy input styles to measure span
       const style = window.getComputedStyle(input);
