@@ -112,7 +112,7 @@ export default function BootLog({
         if (isAlreadyStarting && !canStart) {
           if (!isMounted.current) return; // Don't start polling if unmounted
           setPhase("provisioning");
-          addLog("Resuming workspace startup...");
+          addLog("Workspace starting...");
           setProgress(30);
           startPolling(token);
           return;
