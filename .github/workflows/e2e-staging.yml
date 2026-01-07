@@ -1,0 +1,98 @@
+name: E2E Tests (Staging)
+
+on:
+  # Run after successful deployment verification
+  workflow_run:
+    workflows: ["Post-Deployment Verification"]
+    types:
+      - completed
+    branches: [main, develop]
+
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to test against"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+
+  # Run on schedule to catch environment drift
+  schedule:
+    # Run every 6 hours
+    - cron: "0 */6 * * *"
+
+jobs:
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    # Only run if deployment verification succeeded or manual trigger
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Determine environment URLs
+        id: urls
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENV="${{ inputs.environment }}"
+          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
+            ENV="staging"
+          else
+            # Default to staging for workflow_run
+            ENV="staging"
+          fi
+
+          if [[ "$ENV" == "production" ]]; then
+            # Use Railway URLs directly (custom domain may not be configured)
+            echo "api_url=https://control-plane-production-1516.up.railway.app" >> $GITHUB_OUTPUT
+            echo "web_url=https://www.untethered.computer" >> $GITHUB_OUTPUT
+          else
+            # Staging uses Railway URLs
+            echo "api_url=https://control-plane-staging.up.railway.app" >> $GITHUB_OUTPUT
+            echo "web_url=https://web-staging.up.railway.app" >> $GITHUB_OUTPUT
+          fi
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+
+      - name: Run E2E tests
+        env:
+          STAGING_API_URL: ${{ steps.urls.outputs.api_url }}
+          STAGING_WEB_URL: ${{ steps.urls.outputs.web_url }}
+        run: pnpm --filter @ccc/control-plane test:e2e
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results-${{ steps.urls.outputs.environment }}
+          path: |
+            apps/control-plane/test-results/
+            apps/control-plane/coverage/
+          retention-days: 7
+
+      - name: Report status
+        if: always()
+        run: |
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "✅ E2E tests passed for ${{ steps.urls.outputs.environment }}"
+          else
+            echo "::error::❌ E2E tests failed for ${{ steps.urls.outputs.environment }}"
+            echo "Check the test logs above for details"
+          fi
