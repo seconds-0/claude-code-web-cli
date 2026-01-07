@@ -90,18 +90,18 @@ export default function WaitlistPage() {
           letter-spacing: 0.05em !important;
         }
 
+        .cl-formFieldRoot {
+          position: relative !important;
+        }
+
         .cl-formFieldInput {
           background: var(--background) !important;
           border: 1px solid var(--border) !important;
           border-radius: 0 !important;
           color: var(--foreground) !important;
           font-family: var(--font-mono) !important;
-          caret-color: var(--primary) !important;
-        }
-
-        .cl-formFieldInput::placeholder {
-          color: var(--muted) !important;
-          opacity: 0.7 !important;
+          caret-color: transparent !important;
+          padding-right: 2rem !important;
         }
 
         .cl-formFieldInput::placeholder {
@@ -112,6 +112,25 @@ export default function WaitlistPage() {
         .cl-formFieldInput:focus {
           border-color: var(--primary) !important;
           box-shadow: none !important;
+        }
+
+        /* Terminal blinking underscore cursor */
+        .cl-formFieldRoot:focus-within::after {
+          content: "_";
+          position: absolute;
+          right: 0.75rem;
+          bottom: 0.75rem;
+          color: var(--primary);
+          font-family: var(--font-mono);
+          font-size: 0.875rem;
+          font-weight: 600;
+          animation: terminal-blink 1s step-end infinite;
+          pointer-events: none;
+        }
+
+        @keyframes terminal-blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
         }
 
         .cl-formButtonPrimary {

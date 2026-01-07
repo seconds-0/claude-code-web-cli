@@ -13,7 +13,7 @@ export default function SignInPage() {
               {/* Step 1: Start - Social + Email */}
               <SignIn.Step name="start" className="auth-card">
                 <div className="auth-header">
-                  <span className="auth-label">AUTH.01 / SIGN_IN</span>
+                  <span className="auth-label">AUTH.01 / SIGN_IN / v2</span>
                   <h1>Access Terminal</h1>
                   <p>Sign in to your workspace</p>
                 </div>
@@ -295,23 +295,49 @@ export default function SignInPage() {
         /* Form Fields */
         .auth-field {
           margin-bottom: 1.25rem;
+          position: relative;
         }
 
         .auth-input {
           width: 100%;
           padding: 0.875rem 1rem;
+          padding-right: 2rem;
           background: var(--background);
           color: var(--foreground);
           border: 1px solid var(--border);
           font-family: var(--font-mono);
           font-size: 0.875rem;
           transition: border-color var(--transition);
-          caret-color: var(--primary);
+          caret-color: transparent;
         }
 
         .auth-input:focus {
           outline: none;
           border-color: var(--primary);
+        }
+
+        /* Terminal blinking underscore cursor */
+        .auth-field:focus-within::after {
+          content: "_";
+          position: absolute;
+          right: 0.75rem;
+          bottom: calc(0.875rem + 0.25rem);
+          color: var(--primary);
+          font-family: var(--font-mono);
+          font-size: 0.875rem;
+          font-weight: 600;
+          animation: terminal-blink 1s step-end infinite;
+          pointer-events: none;
+        }
+
+        @keyframes terminal-blink {
+          0%,
+          100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0;
+          }
         }
 
         .auth-input::placeholder {
