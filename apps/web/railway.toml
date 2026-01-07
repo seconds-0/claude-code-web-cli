@@ -1,8 +1,7 @@
-# Use Dockerfile (Next.js web app) from project root
 [build]
 builder = "dockerfile"
-dockerfilePath = "Dockerfile"
-watchPatterns = ["apps/web/**", "packages/**", "Dockerfile", "turbo.json", "package.json", "pnpm-lock.yaml"]
+dockerfilePath = "Dockerfile.web"
+watchPatterns = ["apps/web/**", "packages/**", "Dockerfile.web", "turbo.json", "package.json", "pnpm-lock.yaml"]
 
 [deploy]
 healthcheckPath = "/"

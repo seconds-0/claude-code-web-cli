@@ -1,6 +1,6 @@
 [build]
 builder = "dockerfile"
-dockerfilePath = "../../Dockerfile"
+dockerfilePath = "Dockerfile.control-plane"
 
 [deploy]
 startCommand = "./start.sh"
