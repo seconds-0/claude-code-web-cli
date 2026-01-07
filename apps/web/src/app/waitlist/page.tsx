@@ -81,12 +81,26 @@ export default function WaitlistPage() {
           display: none !important;
         }
 
+        .cl-formFieldLabel {
+          color: var(--foreground) !important;
+          font-family: var(--font-mono) !important;
+          font-size: 0.75rem !important;
+          font-weight: 500 !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.05em !important;
+        }
+
         .cl-formFieldInput {
           background: var(--background) !important;
           border: 1px solid var(--border) !important;
           border-radius: 0 !important;
           color: var(--foreground) !important;
           font-family: var(--font-mono) !important;
+        }
+
+        .cl-formFieldInput::placeholder {
+          color: var(--muted) !important;
+          opacity: 0.7 !important;
         }
 
         .cl-formFieldInput:focus {
