@@ -13,7 +13,7 @@ export default function SignInPage() {
               {/* Step 1: Start - Social + Email */}
               <SignIn.Step name="start" className="auth-card">
                 <div className="auth-header">
-                  <span className="auth-label">AUTH.01 / SIGN_IN / v2</span>
+                  <span className="auth-label">AUTH.01 / SIGN_IN</span>
                   <h1>Access Terminal</h1>
                   <p>Sign in to your workspace</p>
                 </div>
