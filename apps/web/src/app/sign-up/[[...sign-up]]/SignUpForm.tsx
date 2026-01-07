@@ -2,10 +2,98 @@
 
 import * as Clerk from "@clerk/elements/common";
 import * as SignUp from "@clerk/elements/sign-up";
+import { useEffect, useRef } from "react";
 
 export default function SignUpForm() {
+  const measureRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const measureSpan = measureRef.current;
+    if (!measureSpan) return;
+
+    // Map to track cursor elements for each input
+    const cursors = new Map<HTMLInputElement, HTMLSpanElement>();
+
+    const updateCursor = (input: HTMLInputElement) => {
+      let cursor = cursors.get(input);
+
+      // Create cursor element if it doesn't exist
+      if (!cursor) {
+        cursor = document.createElement("span");
+        cursor.className = "terminal-cursor";
+        cursor.textContent = "_";
+        input.parentElement?.appendChild(cursor);
+        cursors.set(input, cursor);
+      }
+
+      // Get text up to cursor position
+      const text = input.value.substring(0, input.selectionStart || 0);
+
+      // Copy input styles to measure span
+      const style = window.getComputedStyle(input);
+      measureSpan.style.font = style.font;
+      measureSpan.style.letterSpacing = style.letterSpacing;
+      measureSpan.textContent = text || "";
+
+      // Calculate position
+      const textWidth = measureSpan.offsetWidth;
+      const paddingLeft = parseFloat(style.paddingLeft);
+
+      cursor.style.left = `${paddingLeft + textWidth}px`;
+      cursor.style.display = document.activeElement === input ? "block" : "none";
+    };
+
+    const handleFocus = (e: FocusEvent) => {
+      if (e.target instanceof HTMLInputElement && e.target.classList.contains("auth-input")) {
+        updateCursor(e.target);
+      }
+    };
+
+    const handleBlur = (e: FocusEvent) => {
+      if (e.target instanceof HTMLInputElement) {
+        const cursor = cursors.get(e.target);
+        if (cursor) cursor.style.display = "none";
+      }
+    };
+
+    const handleInput = (e: Event) => {
+      if (e.target instanceof HTMLInputElement && e.target.classList.contains("auth-input")) {
+        updateCursor(e.target);
+      }
+    };
+
+    // Use capture phase to catch events before they bubble
+    document.addEventListener("focus", handleFocus, true);
+    document.addEventListener("blur", handleBlur, true);
+    document.addEventListener("input", handleInput, true);
+    document.addEventListener("click", handleInput, true);
+    document.addEventListener("keyup", handleInput, true);
+
+    return () => {
+      document.removeEventListener("focus", handleFocus, true);
+      document.removeEventListener("blur", handleBlur, true);
+      document.removeEventListener("input", handleInput, true);
+      document.removeEventListener("click", handleInput, true);
+      document.removeEventListener("keyup", handleInput, true);
+
+      // Clean up cursor elements
+      cursors.forEach((cursor) => cursor.remove());
+      cursors.clear();
+    };
+  }, []);
+
   return (
     <div className="auth-container">
+      {/* Hidden span for measuring text width */}
+      <span
+        ref={measureRef}
+        style={{
+          position: "absolute",
+          visibility: "hidden",
+          whiteSpace: "pre",
+          pointerEvents: "none",
+        }}
+      />
       <SignUp.Root>
         <Clerk.Loading>
           {(isGlobalLoading) => (
@@ -293,7 +381,6 @@ export default function SignUpForm() {
         .auth-input {
           width: 100%;
           padding: 0.875rem 1rem;
-          padding-right: 2rem;
           background: var(--background);
           color: var(--foreground);
           border: 1px solid var(--border);
@@ -309,10 +396,8 @@ export default function SignUpForm() {
         }
 
         /* Terminal blinking underscore cursor */
-        .auth-field:focus-within::after {
-          content: "_";
+        .terminal-cursor {
           position: absolute;
-          right: 0.75rem;
           bottom: calc(0.875rem + 0.25rem);
           color: var(--primary);
           font-family: var(--font-mono);
@@ -320,6 +405,7 @@ export default function SignUpForm() {
           font-weight: 600;
           animation: terminal-blink 1s step-end infinite;
           pointer-events: none;
+          display: none;
         }
 
         @keyframes terminal-blink {

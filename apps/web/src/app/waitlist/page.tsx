@@ -1,8 +1,98 @@
+"use client";
+
 import { Waitlist } from "@clerk/nextjs";
+import { useEffect, useRef } from "react";
 
 export default function WaitlistPage() {
+  const measureRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const measureSpan = measureRef.current;
+    if (!measureSpan) return;
+
+    // Map to track cursor elements for each input
+    const cursors = new Map<HTMLInputElement, HTMLSpanElement>();
+
+    const updateCursor = (input: HTMLInputElement) => {
+      let cursor = cursors.get(input);
+
+      // Create cursor element if it doesn't exist
+      if (!cursor) {
+        cursor = document.createElement("span");
+        cursor.className = "terminal-cursor";
+        cursor.textContent = "_";
+        input.parentElement?.appendChild(cursor);
+        cursors.set(input, cursor);
+      }
+
+      // Get text up to cursor position
+      const text = input.value.substring(0, input.selectionStart || 0);
+
+      // Copy input styles to measure span
+      const style = window.getComputedStyle(input);
+      measureSpan.style.font = style.font;
+      measureSpan.style.letterSpacing = style.letterSpacing;
+      measureSpan.textContent = text || "";
+
+      // Calculate position
+      const textWidth = measureSpan.offsetWidth;
+      const paddingLeft = parseFloat(style.paddingLeft);
+
+      cursor.style.left = `${paddingLeft + textWidth}px`;
+      cursor.style.display = document.activeElement === input ? "block" : "none";
+    };
+
+    const handleFocus = (e: FocusEvent) => {
+      if (e.target instanceof HTMLInputElement && e.target.closest(".cl-formFieldRoot")) {
+        updateCursor(e.target);
+      }
+    };
+
+    const handleBlur = (e: FocusEvent) => {
+      if (e.target instanceof HTMLInputElement) {
+        const cursor = cursors.get(e.target);
+        if (cursor) cursor.style.display = "none";
+      }
+    };
+
+    const handleInput = (e: Event) => {
+      if (e.target instanceof HTMLInputElement && e.target.closest(".cl-formFieldRoot")) {
+        updateCursor(e.target);
+      }
+    };
+
+    // Use capture phase to catch events before they bubble
+    document.addEventListener("focus", handleFocus, true);
+    document.addEventListener("blur", handleBlur, true);
+    document.addEventListener("input", handleInput, true);
+    document.addEventListener("click", handleInput, true);
+    document.addEventListener("keyup", handleInput, true);
+
+    return () => {
+      document.removeEventListener("focus", handleFocus, true);
+      document.removeEventListener("blur", handleBlur, true);
+      document.removeEventListener("input", handleInput, true);
+      document.removeEventListener("click", handleInput, true);
+      document.removeEventListener("keyup", handleInput, true);
+
+      // Clean up cursor elements
+      cursors.forEach((cursor) => cursor.remove());
+      cursors.clear();
+    };
+  }, []);
+
   return (
     <div className="waitlist-container">
+      {/* Hidden span for measuring text width */}
+      <span
+        ref={measureRef}
+        style={{
+          position: "absolute",
+          visibility: "hidden",
+          whiteSpace: "pre",
+          pointerEvents: "none",
+        }}
+      />
       <div className="waitlist-header">
         <span className="waitlist-label">WAIT.01 / JOIN_WAITLIST</span>
         <h1>Join the Waitlist</h1>
@@ -101,7 +191,6 @@ export default function WaitlistPage() {
           color: var(--foreground) !important;
           font-family: var(--font-mono) !important;
           caret-color: transparent !important;
-          padding-right: 2rem !important;
         }
 
         .cl-formFieldInput::placeholder {
@@ -115,10 +204,8 @@ export default function WaitlistPage() {
         }
 
         /* Terminal blinking underscore cursor */
-        .cl-formFieldRoot:focus-within::after {
-          content: "_";
+        .terminal-cursor {
           position: absolute;
-          right: 0.75rem;
           bottom: 0.75rem;
           color: var(--primary);
           font-family: var(--font-mono);
@@ -126,6 +213,7 @@ export default function WaitlistPage() {
           font-weight: 600;
           animation: terminal-blink 1s step-end infinite;
           pointer-events: none;
+          display: none;
         }
 
         @keyframes terminal-blink {
