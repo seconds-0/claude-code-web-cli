@@ -1,6 +1,7 @@
-# Use auto-detected nixpacks from root
 [build]
-watchPatterns = ["apps/web/**", "packages/**", "nixpacks.toml", "turbo.json", "package.json", "pnpm-lock.yaml"]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.web"
+watchPatterns = ["apps/web/**", "packages/**", "turbo.json", "package.json", "pnpm-lock.yaml"]
 
 [deploy]
 restartPolicyType = "on_failure"
