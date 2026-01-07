@@ -1,9 +1,11 @@
 [build]
 builder = "dockerfile"
 dockerfilePath = "Dockerfile.web"
-watchPatterns = ["apps/web/**", "packages/**", "turbo.json", "package.json", "pnpm-lock.yaml"]
+watchPatterns = ["apps/web/**", "packages/**", "Dockerfile.web", "turbo.json", "package.json", "pnpm-lock.yaml"]
 
 [deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 100
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 

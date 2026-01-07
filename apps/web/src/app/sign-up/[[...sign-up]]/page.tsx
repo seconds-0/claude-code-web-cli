@@ -14,7 +14,7 @@ export default function SignUpPage() {
               <SignUp.Step name="start" className="auth-card">
                 <div className="auth-header">
                   <span className="auth-label">REG.01 / CREATE_ACCOUNT</span>
-                  <h1>Initialize System</h1>
+                  <h1>Create Account</h1>
                   <p>Create your workspace account</p>
                 </div>
 
@@ -280,6 +280,8 @@ export default function SignUpPage() {
           text-transform: uppercase;
           letter-spacing: 0.05em;
           color: var(--muted);
+          background: var(--surface);
+          padding: 0 0.5rem;
         }
 
         /* Form Fields */

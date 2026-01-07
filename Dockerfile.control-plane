@@ -50,6 +50,8 @@ RUN chmod +x ./start.sh
 
 ENV NODE_ENV=production
 ENV PORT=3001
+# Cache bust: 2026-01-04-v2
+ENV CACHE_BUST=v2
 
 EXPOSE 3001
 

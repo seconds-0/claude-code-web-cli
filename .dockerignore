@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+
+# Environment files (use Railway env vars instead)
+.env
+.env.*
+.env.local
+.env.*.local
+**/.env
+**/.env.*
+**/.env.local
+**/.env.*.local
+
+# Development
+node_modules
+.next
+.turbo
+*.log
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts that shouldn't be in Docker context
+dist
+build
+coverage
+
+# Test files
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+tests/
+__tests__/
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Misc
+.npmrc
+.yarnrc

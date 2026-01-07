@@ -274,6 +274,8 @@ export default function SignInPage() {
           text-transform: uppercase;
           letter-spacing: 0.05em;
           color: var(--muted);
+          background: var(--surface);
+          padding: 0 0.5rem;
         }
 
         /* Form Fields */
