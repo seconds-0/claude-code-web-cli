@@ -298,6 +298,7 @@ export default function SignUpForm() {
           font-family: var(--font-mono);
           font-size: 0.875rem;
           transition: border-color var(--transition);
+          caret-color: var(--primary);
         }
 
         .auth-input:focus {

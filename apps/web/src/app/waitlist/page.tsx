@@ -96,6 +96,12 @@ export default function WaitlistPage() {
           border-radius: 0 !important;
           color: var(--foreground) !important;
           font-family: var(--font-mono) !important;
+          caret-color: var(--primary) !important;
+        }
+
+        .cl-formFieldInput::placeholder {
+          color: var(--muted) !important;
+          opacity: 0.7 !important;
         }
 
         .cl-formFieldInput::placeholder {
