@@ -9,8 +9,9 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
-    "test": "vitest run",
+    "test": "vitest run --exclude '**/e2e/**'",
     "test:core": "vitest run tests/core/",
+    "test:e2e": "vitest run tests/e2e/",
     "test:watch": "vitest"
   },
   "dependencies": {

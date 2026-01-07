@@ -82,3 +82,37 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm build
+
+  # Verify Dockerfiles build successfully
+  # This catches issues like wrong Dockerfile paths or missing build args
+  docker-build:
+    name: Docker Build Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build control-plane Dockerfile
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.control-plane
+          push: false
+          tags: control-plane:test
+          cache-from: type=gha,scope=control-plane
+          cache-to: type=gha,mode=max,scope=control-plane
+
+      - name: Build web Dockerfile
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.web
+          push: false
+          tags: web:test
+          build-args: |
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
+            NEXT_PUBLIC_CONTROL_PLANE_URL=https://api.untethered.computer
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web

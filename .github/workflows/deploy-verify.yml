@@ -1,0 +1,90 @@
+name: Post-Deployment Verification
+
+on:
+  # Triggered by Railway GitHub integration after deployment
+  deployment_status:
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to verify"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  verify-deployment:
+    name: Verify Deployment Health
+    runs-on: ubuntu-latest
+    # Only run on successful deployments or manual triggers
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.deployment_status.state == 'success'
+    steps:
+      - name: Determine environment URLs
+        id: urls
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENV="${{ inputs.environment }}"
+          else
+            # Extract from deployment status
+            ENV="${{ github.event.deployment_status.environment }}"
+          fi
+
+          if [[ "$ENV" == "production" ]]; then
+            echo "control_plane_url=https://api.untethered.computer" >> $GITHUB_OUTPUT
+            echo "web_url=https://www.untethered.computer" >> $GITHUB_OUTPUT
+          else
+            echo "control_plane_url=https://api-staging.untethered.computer" >> $GITHUB_OUTPUT
+            echo "web_url=https://staging.untethered.computer" >> $GITHUB_OUTPUT
+          fi
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+
+      - name: Wait for services to stabilize
+        run: sleep 30
+
+      - name: Verify control-plane health
+        run: |
+          echo "Checking control-plane at ${{ steps.urls.outputs.control_plane_url }}"
+
+          # Retry up to 5 times with 10 second delays
+          for i in {1..5}; do
+            response=$(curl -sf "${{ steps.urls.outputs.control_plane_url }}/api/v1/health" || echo "FAILED")
+            if [[ "$response" != "FAILED" ]]; then
+              echo "✅ Control-plane health check passed"
+              echo "$response" | jq .
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+
+          echo "❌ Control-plane health check failed after 5 attempts"
+          exit 1
+
+      - name: Verify web app loads
+        run: |
+          echo "Checking web app at ${{ steps.urls.outputs.web_url }}"
+
+          # Retry up to 5 times with 10 second delays
+          for i in {1..5}; do
+            status=$(curl -sf -o /dev/null -w "%{http_code}" "${{ steps.urls.outputs.web_url }}" || echo "000")
+            if [[ "$status" == "200" ]]; then
+              echo "✅ Web app health check passed (HTTP $status)"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $status, retrying in 10s..."
+            sleep 10
+          done
+
+          echo "❌ Web app health check failed after 5 attempts"
+          exit 1
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Deployment verification failed for ${{ steps.urls.outputs.environment }}"
+          echo "Check the logs above for details"
