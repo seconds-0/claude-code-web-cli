@@ -9,11 +9,9 @@
 
 import { describe, it, expect } from "vitest";
 
-// Default to production Railway URLs
-// Override with env vars for testing specific environments (staging, custom domains, etc.)
-// Note: Custom domain (api.untethered.computer) may not be configured - use Railway URLs as defaults
-const STAGING_API_URL =
-  process.env.STAGING_API_URL || "https://control-plane-production-1516.up.railway.app";
+// Default to production custom domain URLs
+// Override with env vars for testing specific environments
+const STAGING_API_URL = process.env.STAGING_API_URL || "https://api.untethered.computer";
 const STAGING_WEB_URL = process.env.STAGING_WEB_URL || "https://www.untethered.computer";
 const TIMEOUT = 30000; // 30 second timeout for network requests
 

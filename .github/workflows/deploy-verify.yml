@@ -35,13 +35,11 @@ jobs:
           fi
 
           if [[ "$ENV" == "production" ]]; then
-            # Use Railway URLs directly (custom domain may not be configured)
-            echo "control_plane_url=https://control-plane-production-1516.up.railway.app" >> $GITHUB_OUTPUT
+            echo "control_plane_url=https://api.untethered.computer" >> $GITHUB_OUTPUT
             echo "web_url=https://www.untethered.computer" >> $GITHUB_OUTPUT
           else
-            # Staging uses Railway URLs
-            echo "control_plane_url=https://control-plane-staging.up.railway.app" >> $GITHUB_OUTPUT
-            echo "web_url=https://web-staging.up.railway.app" >> $GITHUB_OUTPUT
+            echo "control_plane_url=https://api-staging.untethered.computer" >> $GITHUB_OUTPUT
+            echo "web_url=https://staging.untethered.computer" >> $GITHUB_OUTPUT
           fi
           echo "environment=$ENV" >> $GITHUB_OUTPUT
 
