@@ -1,36 +1,24 @@
 "use client";
 
 import * as Clerk from "@clerk/elements/common";
-import * as SignIn from "@clerk/elements/sign-in";
+import * as SignUp from "@clerk/elements/sign-up";
 
-export default function SignInPage() {
+export default function SignUpForm() {
   return (
     <div className="auth-container">
-      <SignIn.Root>
+      <SignUp.Root>
         <Clerk.Loading>
           {(isGlobalLoading) => (
             <>
               {/* Step 1: Start - Social + Email */}
-              <SignIn.Step name="start" className="auth-card">
+              <SignUp.Step name="start" className="auth-card">
                 <div className="auth-header">
-                  <span className="auth-label">AUTH.01 / SIGN_IN</span>
-                  <h1>Access Terminal</h1>
-                  <p>Sign in to your workspace</p>
+                  <span className="auth-label">REG.01 / CREATE_ACCOUNT</span>
+                  <h1>Create Account</h1>
+                  <p>Create your workspace account</p>
                 </div>
 
-                <Clerk.GlobalError>
-                  {({ message }) => (
-                    <div className="auth-global-error">
-                      <p>{message}</p>
-                      <p className="auth-error-help">
-                        Don't have an account?{" "}
-                        <a href="/waitlist" className="auth-error-link">
-                          Join the waitlist
-                        </a>
-                      </p>
-                    </div>
-                  )}
-                </Clerk.GlobalError>
+                <Clerk.GlobalError className="auth-global-error" />
 
                 {/* Social Buttons */}
                 <div className="social-buttons">
@@ -70,35 +58,60 @@ export default function SignInPage() {
                 </div>
 
                 {/* Email Input */}
-                <Clerk.Field name="identifier" className="auth-field">
+                <Clerk.Field name="emailAddress" className="auth-field">
                   <Clerk.Label className="auth-label">Email Address</Clerk.Label>
                   <Clerk.Input type="email" className="auth-input" placeholder="you@example.com" />
                   <Clerk.FieldError className="auth-error" />
                 </Clerk.Field>
 
-                <SignIn.Action submit className="auth-submit" disabled={isGlobalLoading}>
+                <SignUp.Captcha className="captcha-container" />
+
+                <SignUp.Action submit className="auth-submit" disabled={isGlobalLoading}>
+                  <Clerk.Loading>
+                    {(isLoading) =>
+                      isLoading ? <span className="loading-spinner" /> : "Create Account"
+                    }
+                  </Clerk.Loading>
+                </SignUp.Action>
+
+                <div className="auth-footer">
+                  <span>Already have access?</span>
+                  <Clerk.Link navigate="sign-in" className="auth-link">
+                    Sign in
+                  </Clerk.Link>
+                </div>
+              </SignUp.Step>
+
+              {/* Step 2: Continue - Extra fields if needed (e.g., after OAuth) */}
+              <SignUp.Step name="continue" className="auth-card">
+                <div className="auth-header">
+                  <span className="auth-label">REG.02 / COMPLETE_PROFILE</span>
+                  <h1>Almost There</h1>
+                  <p>Complete your account setup</p>
+                </div>
+
+                <Clerk.GlobalError className="auth-global-error" />
+
+                <Clerk.Field name="emailAddress" className="auth-field">
+                  <Clerk.Label className="auth-label">Email Address</Clerk.Label>
+                  <Clerk.Input type="email" className="auth-input" placeholder="you@example.com" />
+                  <Clerk.FieldError className="auth-error" />
+                </Clerk.Field>
+
+                <SignUp.Action submit className="auth-submit" disabled={isGlobalLoading}>
                   <Clerk.Loading>
                     {(isLoading) => (isLoading ? <span className="loading-spinner" /> : "Continue")}
                   </Clerk.Loading>
-                </SignIn.Action>
+                </SignUp.Action>
+              </SignUp.Step>
 
-                <div className="auth-footer">
-                  <span>New to the system?</span>
-                  <Clerk.Link navigate="sign-up" className="auth-link">
-                    Create account
-                  </Clerk.Link>
-                </div>
-              </SignIn.Step>
-
-              {/* Step 2: Verification - OTP Code */}
-              <SignIn.Step name="verifications" className="auth-card">
-                <SignIn.Strategy name="email_code">
+              {/* Step 3: Verification - OTP Code */}
+              <SignUp.Step name="verifications" className="auth-card">
+                <SignUp.Strategy name="email_code">
                   <div className="auth-header">
-                    <span className="auth-label">AUTH.02 / VERIFY</span>
-                    <h1>Check Your Email</h1>
-                    <p>
-                      We sent a code to <SignIn.SafeIdentifier />
-                    </p>
+                    <span className="auth-label">REG.03 / VERIFY</span>
+                    <h1>Verify Email</h1>
+                    <p>Enter the code sent to your email</p>
                   </div>
 
                   <Clerk.GlobalError className="auth-global-error" />
@@ -121,14 +134,14 @@ export default function SignInPage() {
                     <Clerk.FieldError className="auth-error" />
                   </Clerk.Field>
 
-                  <SignIn.Action submit className="auth-submit" disabled={isGlobalLoading}>
+                  <SignUp.Action submit className="auth-submit" disabled={isGlobalLoading}>
                     <Clerk.Loading>
                       {(isLoading) => (isLoading ? <span className="loading-spinner" /> : "Verify")}
                     </Clerk.Loading>
-                  </SignIn.Action>
+                  </SignUp.Action>
 
                   <div className="auth-actions">
-                    <SignIn.Action
+                    <SignUp.Action
                       resend
                       className="auth-link-btn"
                       fallback={({ resendableAfter }) => (
@@ -136,39 +149,18 @@ export default function SignInPage() {
                       )}
                     >
                       Resend code
-                    </SignIn.Action>
+                    </SignUp.Action>
 
-                    <SignIn.Action navigate="start" className="auth-link-btn">
+                    <SignUp.Action navigate="start" className="auth-link-btn">
                       ← Back
-                    </SignIn.Action>
+                    </SignUp.Action>
                   </div>
-                </SignIn.Strategy>
-              </SignIn.Step>
-
-              {/* Step 3: Choose Strategy (fallback) */}
-              <SignIn.Step name="choose-strategy" className="auth-card">
-                <div className="auth-header">
-                  <span className="auth-label">AUTH.03 / OPTIONS</span>
-                  <h1>Alternative Methods</h1>
-                  <p>Choose another way to sign in</p>
-                </div>
-
-                <div className="strategy-options">
-                  <SignIn.SupportedStrategy name="email_code" asChild>
-                    <button type="button" className="strategy-btn">
-                      Email me a code
-                    </button>
-                  </SignIn.SupportedStrategy>
-                </div>
-
-                <SignIn.Action navigate="previous" className="auth-link-btn">
-                  ← Back
-                </SignIn.Action>
-              </SignIn.Step>
+                </SignUp.Strategy>
+              </SignUp.Step>
             </>
           )}
         </Clerk.Loading>
-      </SignIn.Root>
+      </SignUp.Root>
 
       <style jsx global>{`
         .auth-container {
@@ -341,25 +333,9 @@ export default function SignInPage() {
           color: var(--error);
         }
 
-        .auth-global-error p {
-          margin: 0;
-        }
-
-        .auth-error-help {
-          margin-top: 0.5rem !important;
-          padding-top: 0.5rem;
-          border-top: 1px solid rgba(255, 51, 51, 0.2);
-          color: var(--muted);
-        }
-
-        .auth-error-link {
-          color: var(--primary);
-          text-decoration: none;
-          font-weight: 500;
-        }
-
-        .auth-error-link:hover {
-          text-decoration: underline;
+        /* Captcha Container */
+        .captcha-container {
+          margin-bottom: 1.25rem;
         }
 
         /* Submit Button */
@@ -488,40 +464,6 @@ export default function SignInPage() {
           font-family: var(--font-mono);
           font-size: 0.75rem;
           color: var(--muted);
-        }
-
-        /* Strategy Options */
-        .strategy-options {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-          margin-bottom: 1.5rem;
-        }
-
-        .strategy-btn {
-          width: 100%;
-          padding: 0.875rem 1rem;
-          background: var(--surface);
-          color: var(--foreground);
-          border: 1px solid var(--border-strong);
-          font-family: var(--font-mono);
-          font-size: 0.75rem;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          cursor: pointer;
-          box-shadow: var(--shadow);
-          transition:
-            transform var(--transition-fast),
-            box-shadow var(--transition-fast);
-        }
-
-        .strategy-btn:hover {
-          background: var(--surface-hover);
-        }
-
-        .strategy-btn:active {
-          transform: translate(2px, 2px);
-          box-shadow: none;
         }
 
         /* Loading Spinner */
