@@ -116,3 +116,28 @@ jobs:
             NEXT_PUBLIC_CONTROL_PLANE_URL=https://api.untethered.computer
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
+
+  # E2E smoke tests run against staging after build passes
+  e2e:
+    name: E2E Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter e2e-tests exec playwright install chromium
+
+      - name: Run E2E smoke tests
+        run: pnpm --filter e2e-tests test:smoke --project=chromium
+        env:
+          STAGING_WEB_URL: https://www.untethered.computer
