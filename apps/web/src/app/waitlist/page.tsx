@@ -45,7 +45,10 @@ export default function WaitlistPage() {
     };
 
     const handleFocus = (e: FocusEvent) => {
-      if (e.target instanceof HTMLInputElement && e.target.closest(".cl-formFieldRoot")) {
+      if (
+        e.target instanceof HTMLInputElement &&
+        e.target.classList.contains("cl-formFieldInput")
+      ) {
         updateCursor(e.target);
       }
     };
@@ -58,7 +61,10 @@ export default function WaitlistPage() {
     };
 
     const handleInput = (e: Event) => {
-      if (e.target instanceof HTMLInputElement && e.target.closest(".cl-formFieldRoot")) {
+      if (
+        e.target instanceof HTMLInputElement &&
+        e.target.classList.contains("cl-formFieldInput")
+      ) {
         updateCursor(e.target);
       }
     };
