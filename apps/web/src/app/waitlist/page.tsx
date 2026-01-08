@@ -78,9 +78,30 @@ export default function WaitlistPage() {
           border-radius: 0 !important;
         }
 
-        .cl-headerTitle,
-        .cl-headerSubtitle {
+        /* Hide Clerk header when form is showing (we have custom header) */
+        .cl-card:has(.cl-formFieldInput) .cl-headerTitle,
+        .cl-card:has(.cl-formFieldInput) .cl-headerSubtitle {
           display: none !important;
+        }
+
+        /* Style Clerk's success header when form is NOT showing */
+        .cl-card:not(:has(.cl-formFieldInput)) .cl-headerTitle {
+          color: var(--foreground) !important;
+          font-size: 1.25rem !important;
+          font-weight: 700 !important;
+          text-align: center !important;
+          margin-bottom: 0.5rem !important;
+        }
+
+        .cl-card:not(:has(.cl-formFieldInput)) .cl-headerSubtitle {
+          color: var(--muted) !important;
+          font-size: 0.875rem !important;
+          text-align: center !important;
+        }
+
+        /* Hide custom header when showing success state */
+        .waitlist-container:has(.cl-card:not(:has(.cl-formFieldInput))) .waitlist-header {
+          display: none;
         }
 
         .cl-formFieldLabel {
