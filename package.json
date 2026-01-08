@@ -8,6 +8,7 @@
     "build": "turbo build",
     "test": "turbo test",
     "test:core": "turbo test:core",
+    "test:e2e": "turbo test:e2e",
     "test:watch": "turbo test -- --watch",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

@@ -1,0 +1,13 @@
+# Auth state files (contain session tokens)
+auth/*.json
+
+# Playwright outputs
+playwright-report/
+blob-report/
+test-results/
+
+# Dependencies
+node_modules/
+
+# Build
+dist/
