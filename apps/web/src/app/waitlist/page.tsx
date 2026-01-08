@@ -100,7 +100,7 @@ export default function WaitlistPage() {
         }
 
         /* Hide custom header when showing success state */
-        .waitlist-container:has(.cl-card:not(:has(.cl-formFieldInput))) .waitlist-header {
+        .waitlist-container:has([data-localization-key="waitlist.success.title"]) .waitlist-header {
           display: none;
         }
 
