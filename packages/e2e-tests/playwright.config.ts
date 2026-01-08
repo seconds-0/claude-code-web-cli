@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Default URLs
-const WEB_URL = process.env.STAGING_WEB_URL || "https://www.untethered.computer";
+const WEB_URL = process.env.STAGING_WEB_URL || "https://staging.untethered.computer";
 
 // Auth state file path
 const authFile = path.join(__dirname, "auth/user.json");

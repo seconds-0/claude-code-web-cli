@@ -140,4 +140,4 @@ jobs:
       - name: Run E2E smoke tests
         run: pnpm --filter e2e-tests test:smoke --project=chromium
         env:
-          STAGING_WEB_URL: https://www.untethered.computer
+          STAGING_WEB_URL: https://staging.untethered.computer
