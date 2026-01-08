@@ -62,14 +62,18 @@ async function safeJsonParse<T>(c: { req: { json: () => Promise<unknown> } }): P
 
 /**
  * Check if an error is a database connection error
+ * Be specific to avoid false positives from Stripe/other network errors
  */
 function isDatabaseError(error: unknown): boolean {
   if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
     return (
-      error.message.includes("database") ||
-      error.message.includes("ECONNREFUSED") ||
-      error.message.includes("fetch failed") ||
-      error.name === "NeonDbError"
+      error.name === "NeonDbError" ||
+      msg.includes("database") ||
+      msg.includes("econnrefused") ||
+      msg.includes("neon") ||
+      msg.includes("postgres") ||
+      msg.includes("drizzle")
     );
   }
   return false;
@@ -304,8 +308,7 @@ billingRoute.post("/checkout", async (c) => {
     if (isDatabaseError(error)) {
       return c.json({ error: "Database temporarily unavailable" }, 503);
     }
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return c.json({ error: message }, 400);
+    return c.json({ error: "Internal server error" }, 500);
   }
 });
 
@@ -356,8 +359,7 @@ billingRoute.post("/portal", async (c) => {
     if (isDatabaseError(error)) {
       return c.json({ error: "Database temporarily unavailable" }, 503);
     }
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return c.json({ error: message }, 400);
+    return c.json({ error: "Internal server error" }, 500);
   }
 });
 
