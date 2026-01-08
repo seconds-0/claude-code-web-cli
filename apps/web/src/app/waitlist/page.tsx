@@ -25,6 +25,10 @@ export default function WaitlistPage() {
         }}
       />
 
+      <a href="/" className="back-to-home">
+        Back to Home
+      </a>
+
       <style>{`
         .waitlist-container {
           display: flex;
@@ -102,6 +106,38 @@ export default function WaitlistPage() {
         /* Hide custom header when showing success state */
         .waitlist-container:has([data-localization-key="waitlist.success.title"]) .waitlist-header {
           display: none;
+        }
+
+        /* Back to Home button - hidden by default, shown on success */
+        .back-to-home {
+          display: none;
+          margin-top: 1.5rem;
+          padding: 1rem 2rem;
+          background: var(--primary);
+          color: white;
+          border: 1px solid var(--primary);
+          font-family: var(--font-mono);
+          font-size: 0.875rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          text-decoration: none;
+          box-shadow: var(--shadow);
+          transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition);
+        }
+
+        .back-to-home:hover {
+          background: var(--primary-hover);
+        }
+
+        .back-to-home:active {
+          transform: translate(2px, 2px);
+          box-shadow: none;
+        }
+
+        /* Show button only on success state */
+        .waitlist-container:has([data-localization-key="waitlist.success.title"]) .back-to-home {
+          display: inline-block;
         }
 
         .cl-formFieldLabel {
