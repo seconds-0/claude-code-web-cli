@@ -60,7 +60,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm test
+      # Run unit/integration tests (exclude e2e-tests which run separately)
+      - run: pnpm --filter '!e2e-tests' test
 
   build:
     name: Build
