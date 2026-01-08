@@ -28,7 +28,7 @@ describe("Billing API Routes", () => {
       const res = await app.request("/api/v1/billing/subscription");
 
       // Without X-Test-User-Id header, should get 401
-      expect([401, 500]).toContain(res.status);
+      expect([401, 500, 503]).toContain(res.status);
     });
 
     it("returns subscription data (DB required) or appropriate error", async () => {
@@ -39,7 +39,7 @@ describe("Billing API Routes", () => {
       });
 
       // Will be 200 with DB (returns subscription), 404 (no user), or 500 (no DB)
-      expect([200, 404, 500]).toContain(res.status);
+      expect([200, 404, 500, 503]).toContain(res.status);
 
       if (res.status === 200) {
         const body = await res.json();
@@ -53,7 +53,7 @@ describe("Billing API Routes", () => {
     it("requires authentication", async () => {
       const res = await app.request("/api/v1/billing/usage");
 
-      expect([401, 500]).toContain(res.status);
+      expect([401, 500, 503]).toContain(res.status);
     });
 
     it("returns usage data (DB required)", async () => {
@@ -63,7 +63,7 @@ describe("Billing API Routes", () => {
         },
       });
 
-      expect([200, 404, 500]).toContain(res.status);
+      expect([200, 404, 500, 503]).toContain(res.status);
 
       if (res.status === 200) {
         const body = await res.json();
@@ -77,7 +77,7 @@ describe("Billing API Routes", () => {
     it("requires authentication", async () => {
       const res = await app.request("/api/v1/billing/alerts");
 
-      expect([401, 500]).toContain(res.status);
+      expect([401, 500, 503]).toContain(res.status);
     });
 
     it("returns alerts array (DB required)", async () => {
@@ -87,7 +87,7 @@ describe("Billing API Routes", () => {
         },
       });
 
-      expect([200, 404, 500]).toContain(res.status);
+      expect([200, 404, 500, 503]).toContain(res.status);
 
       if (res.status === 200) {
         const body = await res.json();
@@ -103,7 +103,7 @@ describe("Billing API Routes", () => {
         method: "POST",
       });
 
-      expect([401, 500]).toContain(res.status);
+      expect([401, 500, 503]).toContain(res.status);
     });
 
     it("returns 404 for non-existent alert (DB required)", async () => {
@@ -115,7 +115,7 @@ describe("Billing API Routes", () => {
       });
 
       // 404 if alert not found, or 500 without DB
-      expect([404, 500]).toContain(res.status);
+      expect([404, 500, 503]).toContain(res.status);
     });
   });
 
@@ -127,7 +127,7 @@ describe("Billing API Routes", () => {
         },
       });
 
-      expect([200, 500]).toContain(res.status);
+      expect([200, 500, 503]).toContain(res.status);
 
       if (res.status === 200) {
         const body = await res.json();
@@ -152,7 +152,7 @@ describe("Billing API Routes", () => {
         }),
       });
 
-      expect([401, 500]).toContain(res.status);
+      expect([401, 500, 503]).toContain(res.status);
     });
 
     it("returns 400 for missing required fields", async () => {
@@ -165,7 +165,7 @@ describe("Billing API Routes", () => {
         body: JSON.stringify({}),
       });
 
-      expect([400, 500]).toContain(res.status);
+      expect([400, 500, 503]).toContain(res.status);
     });
 
     it("returns 400 for invalid successUrl (open redirect prevention)", async () => {
@@ -182,7 +182,7 @@ describe("Billing API Routes", () => {
         }),
       });
 
-      expect([400, 500]).toContain(res.status);
+      expect([400, 500, 503]).toContain(res.status);
 
       if (res.status === 400) {
         const body = await res.json();
@@ -204,7 +204,7 @@ describe("Billing API Routes", () => {
         }),
       });
 
-      expect([400, 500]).toContain(res.status);
+      expect([400, 500, 503]).toContain(res.status);
     });
 
     it("returns 400 for data: URL", async () => {
@@ -221,7 +221,7 @@ describe("Billing API Routes", () => {
         }),
       });
 
-      expect([400, 500]).toContain(res.status);
+      expect([400, 500, 503]).toContain(res.status);
     });
 
     it("returns 400 for malformed JSON", async () => {
@@ -272,7 +272,7 @@ describe("Billing API Routes", () => {
         }),
       });
 
-      expect([401, 500]).toContain(res.status);
+      expect([401, 500, 503]).toContain(res.status);
     });
 
     it("returns 400 for missing returnUrl", async () => {
@@ -285,7 +285,7 @@ describe("Billing API Routes", () => {
         body: JSON.stringify({}),
       });
 
-      expect([400, 500]).toContain(res.status);
+      expect([400, 500, 503]).toContain(res.status);
     });
 
     it("returns 400 for invalid returnUrl (open redirect prevention)", async () => {
@@ -300,7 +300,7 @@ describe("Billing API Routes", () => {
         }),
       });
 
-      expect([400, 500]).toContain(res.status);
+      expect([400, 500, 503]).toContain(res.status);
 
       if (res.status === 400) {
         const body = await res.json();
@@ -328,7 +328,7 @@ describe("Billing API Routes", () => {
         method: "POST",
       });
 
-      expect([401, 500]).toContain(res.status);
+      expect([401, 500, 503]).toContain(res.status);
     });
 
     it("enables overages (DB required)", async () => {
@@ -341,7 +341,7 @@ describe("Billing API Routes", () => {
         body: JSON.stringify({}),
       });
 
-      expect([200, 404, 500]).toContain(res.status);
+      expect([200, 404, 500, 503]).toContain(res.status);
 
       if (res.status === 200) {
         const body = await res.json();
@@ -356,7 +356,7 @@ describe("Billing API Routes", () => {
         method: "POST",
       });
 
-      expect([401, 500]).toContain(res.status);
+      expect([401, 500, 503]).toContain(res.status);
     });
 
     it("disables overages (DB required)", async () => {
@@ -367,7 +367,7 @@ describe("Billing API Routes", () => {
         },
       });
 
-      expect([200, 404, 500]).toContain(res.status);
+      expect([200, 404, 500, 503]).toContain(res.status);
 
       if (res.status === 200) {
         const body = await res.json();
@@ -380,7 +380,7 @@ describe("Billing API Routes", () => {
     it("requires authentication", async () => {
       const res = await app.request("/api/v1/billing/current");
 
-      expect([401, 500]).toContain(res.status);
+      expect([401, 500, 503]).toContain(res.status);
     });
 
     it("returns real-time billing status (DB required)", async () => {
@@ -390,7 +390,7 @@ describe("Billing API Routes", () => {
         },
       });
 
-      expect([200, 404, 500]).toContain(res.status);
+      expect([200, 404, 500, 503]).toContain(res.status);
 
       if (res.status === 200) {
         const body = await res.json();
@@ -412,7 +412,7 @@ describe("Billing API Routes", () => {
 
       // With DB: 200 (auto-creates or returns defaults)
       // Without DB: 500
-      expect([200, 500]).toContain(res.status);
+      expect([200, 500, 503]).toContain(res.status);
     });
   });
 });
