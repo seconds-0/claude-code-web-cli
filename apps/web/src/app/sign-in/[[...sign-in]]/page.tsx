@@ -2,99 +2,10 @@
 
 import * as Clerk from "@clerk/elements/common";
 import * as SignIn from "@clerk/elements/sign-in";
-import { useEffect, useRef } from "react";
 
 export default function SignInPage() {
-  const measureRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const measureSpan = measureRef.current;
-    if (!measureSpan) return;
-
-    // Map to track cursor elements for each input
-    const cursors = new Map<HTMLInputElement, HTMLSpanElement>();
-
-    const updateCursor = (input: HTMLInputElement) => {
-      let cursor = cursors.get(input);
-
-      // Create cursor element if it doesn't exist
-      if (!cursor) {
-        cursor = document.createElement("span");
-        cursor.className = "terminal-cursor";
-        cursor.textContent = "_";
-        input.parentElement?.appendChild(cursor);
-        cursors.set(input, cursor);
-      }
-
-      // Get text up to cursor position
-      // Note: selectionStart is null for type="email" inputs in browsers
-      const cursorPos = input.selectionStart ?? input.value.length;
-      const text = input.value.substring(0, cursorPos);
-
-      // Copy input styles to measure span
-      const style = window.getComputedStyle(input);
-      measureSpan.style.font = style.font;
-      measureSpan.style.letterSpacing = style.letterSpacing;
-      measureSpan.textContent = text || "";
-
-      // Calculate position
-      const textWidth = measureSpan.offsetWidth;
-      const paddingLeft = parseFloat(style.paddingLeft);
-
-      cursor.style.left = `${paddingLeft + textWidth}px`;
-      cursor.style.display = document.activeElement === input ? "block" : "none";
-    };
-
-    const handleFocus = (e: FocusEvent) => {
-      if (e.target instanceof HTMLInputElement && e.target.classList.contains("auth-input")) {
-        updateCursor(e.target);
-      }
-    };
-
-    const handleBlur = (e: FocusEvent) => {
-      if (e.target instanceof HTMLInputElement) {
-        const cursor = cursors.get(e.target);
-        if (cursor) cursor.style.display = "none";
-      }
-    };
-
-    const handleInput = (e: Event) => {
-      if (e.target instanceof HTMLInputElement && e.target.classList.contains("auth-input")) {
-        updateCursor(e.target);
-      }
-    };
-
-    // Use capture phase to catch events before they bubble
-    document.addEventListener("focus", handleFocus, true);
-    document.addEventListener("blur", handleBlur, true);
-    document.addEventListener("input", handleInput, true);
-    document.addEventListener("click", handleInput, true);
-    document.addEventListener("keyup", handleInput, true);
-
-    return () => {
-      document.removeEventListener("focus", handleFocus, true);
-      document.removeEventListener("blur", handleBlur, true);
-      document.removeEventListener("input", handleInput, true);
-      document.removeEventListener("click", handleInput, true);
-      document.removeEventListener("keyup", handleInput, true);
-
-      // Clean up cursor elements
-      cursors.forEach((cursor) => cursor.remove());
-      cursors.clear();
-    };
-  }, []);
   return (
     <div className="auth-container">
-      {/* Hidden span for measuring text width */}
-      <span
-        ref={measureRef}
-        style={{
-          position: "absolute",
-          visibility: "hidden",
-          whiteSpace: "pre",
-          pointerEvents: "none",
-        }}
-      />
       <SignIn.Root>
         <Clerk.Loading>
           {(isGlobalLoading) => (
@@ -396,35 +307,12 @@ export default function SignInPage() {
           font-family: var(--font-mono);
           font-size: 0.875rem;
           transition: border-color var(--transition);
-          caret-color: transparent;
+          caret-color: var(--primary);
         }
 
         .auth-input:focus {
           outline: none;
           border-color: var(--primary);
-        }
-
-        /* Terminal blinking underscore cursor */
-        .terminal-cursor {
-          position: absolute;
-          bottom: calc(0.875rem + 0.25rem);
-          color: var(--primary);
-          font-family: var(--font-mono);
-          font-size: 0.875rem;
-          font-weight: 600;
-          animation: terminal-blink 1s step-end infinite;
-          pointer-events: none;
-          display: none;
-        }
-
-        @keyframes terminal-blink {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0;
-          }
         }
 
         .auth-input::placeholder {
