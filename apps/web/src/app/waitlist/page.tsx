@@ -8,12 +8,17 @@ export default function WaitlistPage() {
 
   useEffect(() => {
     const measureSpan = measureRef.current;
-    if (!measureSpan) return;
+    console.log("[waitlist cursor] useEffect running, measureSpan:", measureSpan);
+    if (!measureSpan) {
+      console.log("[waitlist cursor] measureSpan is null, returning early");
+      return;
+    }
 
     // Map to track cursor elements for each input
     const cursors = new Map<HTMLInputElement, HTMLSpanElement>();
 
     const updateCursor = (input: HTMLInputElement) => {
+      console.log("[waitlist cursor] updateCursor called for input:", input);
       let cursor = cursors.get(input);
 
       // Create cursor element if it doesn't exist
