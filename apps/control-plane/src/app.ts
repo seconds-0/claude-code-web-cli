@@ -11,6 +11,7 @@ import { costsRoute } from "./routes/costs.js";
 import { stripeWebhooksRoute } from "./routes/stripe-webhooks.js";
 import { billingJobsRoute } from "./routes/billing-jobs.js";
 import { billingRoute } from "./routes/billing.js";
+import { voiceRoute } from "./routes/voice.js";
 
 // Create the main app
 export const app = new Hono();
@@ -50,6 +51,7 @@ app.route("/api/v1/costs", costsRoute);
 app.route("/webhooks/stripe", stripeWebhooksRoute);
 app.route("/jobs", billingJobsRoute);
 app.route("/api/v1/billing", billingRoute);
+app.route("/api/v1/voice", voiceRoute);
 
 // 404 handler
 app.notFound((c) => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import VoiceButton from "./VoiceButton";
 
 interface TerminalAccessoryBarProps {
   workspaceId: string;
@@ -46,6 +47,7 @@ export default function TerminalAccessoryBar({
           {key.label}
         </button>
       ))}
+      <VoiceButton workspaceId={workspaceId} disabled={disabled} />
       <button className="accessory-btn menu-btn" onClick={onMenuPress} aria-label="Menu">
         ☰
       </button>
