@@ -118,13 +118,78 @@ jobs:
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
-  # E2E smoke tests
-  # TODO: Once Railway PR environments are enabled in project settings,
-  # update this to deploy preview and test against PR-specific URL
+  # Deploy PR to Railway preview environment
+  deploy-preview:
+    name: Deploy PR Preview
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: [build]
+    outputs:
+      preview_url: ${{ steps.deploy.outputs.service_domain }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Railway Preview
+        id: deploy
+        uses: ayungavis/railway-preview-deploy@v1.0.2
+        with:
+          railway_api_token: ${{ secrets.RAILWAY_API_TOKEN }}
+          project_id: ${{ secrets.RAILWAY_PROJECT_ID }}
+          environment_name: "production"
+          preview_environment_name: "pr-${{ github.event.pull_request.number }}"
+          branch_name: ${{ github.head_ref }}
+          cleanup: "true"
+          api_service_name: "web"
+
+      - name: Wait for Preview Health
+        run: |
+          PREVIEW_URL="https://${{ steps.deploy.outputs.service_domain }}"
+          echo "Preview URL: $PREVIEW_URL"
+
+          for i in {1..60}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$PREVIEW_URL" || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Preview is healthy!"
+              exit 0
+            fi
+            echo "Waiting for preview... (attempt $i/60, status: $HTTP_CODE)"
+            sleep 5
+          done
+          echo "Timeout waiting for preview"
+          exit 1
+
+  # E2E smoke tests against Railway PR preview
   e2e:
-    name: E2E Smoke Tests
+    name: E2E Smoke Tests (PR Preview)
+    runs-on: ubuntu-latest
+    needs: [build, deploy-preview]
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter e2e-tests exec playwright install chromium
+
+      - name: Run E2E smoke tests
+        run: pnpm --filter e2e-tests test:smoke --project=chromium
+        env:
+          STAGING_WEB_URL: https://${{ needs.deploy-preview.outputs.preview_url }}
+
+  # E2E smoke tests against production (for push to main)
+  e2e-production:
+    name: E2E Smoke Tests (Production)
     runs-on: ubuntu-latest
     needs: [build]
+    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
 
