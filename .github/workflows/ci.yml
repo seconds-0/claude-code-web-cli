@@ -119,18 +119,31 @@ jobs:
           cache-to: type=gha,mode=max,scope=web
 
   # Deploy PR to Railway preview environment
+  # Requires RAILWAY_API_TOKEN and RAILWAY_PROJECT_ID secrets
   deploy-preview:
     name: Deploy PR Preview
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.repository == 'seconds-0/claude-code-web-cli'
     needs: [build]
     outputs:
-      preview_url: ${{ steps.deploy.outputs.service_domain }}
+      preview_url: ${{ steps.set-url.outputs.url }}
+      deployed: ${{ steps.set-url.outputs.deployed }}
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check Railway secrets
+        id: check-secrets
+        run: |
+          if [ -z "${{ secrets.RAILWAY_API_TOKEN }}" ] || [ -z "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
+            echo "has_secrets=false" >> $GITHUB_OUTPUT
+            echo "::warning::Railway secrets not configured. Skipping PR preview deployment."
+          else
+            echo "has_secrets=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Deploy to Railway Preview
         id: deploy
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         uses: ayungavis/railway-preview-deploy@v1.0.2
         with:
           railway_api_token: ${{ secrets.RAILWAY_API_TOKEN }}
@@ -141,7 +154,19 @@ jobs:
           cleanup: "true"
           api_service_name: "web"
 
+      - name: Set output URL
+        id: set-url
+        run: |
+          if [ -n "${{ steps.deploy.outputs.service_domain }}" ]; then
+            echo "url=${{ steps.deploy.outputs.service_domain }}" >> $GITHUB_OUTPUT
+            echo "deployed=true" >> $GITHUB_OUTPUT
+          else
+            echo "url=" >> $GITHUB_OUTPUT
+            echo "deployed=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Wait for Preview Health
+        if: steps.set-url.outputs.deployed == 'true'
         run: |
           PREVIEW_URL="https://${{ steps.deploy.outputs.service_domain }}"
           echo "Preview URL: $PREVIEW_URL"
@@ -158,12 +183,12 @@ jobs:
           echo "Timeout waiting for preview"
           exit 1
 
-  # E2E smoke tests against Railway PR preview
+  # E2E smoke tests against Railway PR preview (or production if preview not deployed)
   e2e:
     name: E2E Smoke Tests (PR Preview)
     runs-on: ubuntu-latest
     needs: [build, deploy-preview]
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && always() && needs.build.result == 'success'
     steps:
       - uses: actions/checkout@v4
 
@@ -182,7 +207,8 @@ jobs:
       - name: Run E2E smoke tests
         run: pnpm --filter e2e-tests test:smoke --project=chromium
         env:
-          STAGING_WEB_URL: https://${{ needs.deploy-preview.outputs.preview_url }}
+          # Use preview URL if deployed, otherwise fall back to production
+          STAGING_WEB_URL: ${{ needs.deploy-preview.outputs.deployed == 'true' && format('https://{0}', needs.deploy-preview.outputs.preview_url) || 'https://www.untethered.computer' }}
 
   # E2E smoke tests against production (for push to main)
   e2e-production:
