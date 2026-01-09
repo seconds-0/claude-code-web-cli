@@ -119,10 +119,12 @@ QSTASH_NEXT_SIGNING_KEY=sig_xxx
 
 **Goal:** Speak → Claude executes
 
-- [ ] **Compare Deepgram vs Parakeet** - test accuracy on coding/terminal commands (18% vs 6% WER claimed, but Deepgram is 14x cheaper: $0.36 vs $5 per 1K requests)
-- [ ] Voice button in terminal UI
-- [ ] Voice-to-command transcription (winner of comparison above)
-- [ ] Visual feedback during voice capture
+- [x] Voice button in terminal UI (VoiceButton.tsx)
+- [x] Control plane endpoint (/api/v1/voice/transcribe)
+- [x] Modal + Parakeet deployment code (packages/voice-stt/)
+- [ ] **Deploy Modal + Parakeet** - run `cd packages/voice-stt && modal deploy main.py`, add MODAL_VOICE_ENDPOINT to Railway
+- [ ] Test end-to-end: voice → transcription → terminal input
+- [ ] Compare Deepgram vs Parakeet accuracy on coding commands (18% vs 6% WER claimed, but Deepgram is 14x cheaper)
 
 #### NVIDIA Parakeet Research (2026-01-09)
 
