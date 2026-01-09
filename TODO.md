@@ -119,10 +119,31 @@ QSTASH_NEXT_SIGNING_KEY=sig_xxx
 
 **Goal:** Speak → Claude executes
 
-- [ ] Deepgram WebSocket integration
+- [ ] **Compare Deepgram vs Parakeet** - test accuracy on coding/terminal commands (18% vs 6% WER claimed, but Deepgram is 14x cheaper: $0.36 vs $5 per 1K requests)
 - [ ] Voice button in terminal UI
-- [ ] Voice-to-command transcription
+- [ ] Voice-to-command transcription (winner of comparison above)
 - [ ] Visual feedback during voice capture
+
+#### NVIDIA Parakeet Research (2026-01-09)
+
+**Key finding:** NVIDIA's Parakeet models are open-source, self-hostable, and outperform most alternatives.
+
+| Model        | Parakeet-TDT-v2 | Deepgram Nova-3 | OpenAI Whisper |
+| ------------ | --------------- | --------------- | -------------- |
+| WER (clean)  | **6.05%**       | ~18%            | ~6-8%          |
+| Speed (RTFx) | **3,380**       | Sub-300ms       | ~0.1-0.5       |
+| License      | CC-BY-4.0       | Proprietary     | MIT            |
+| Self-host    | ✅              | ❌              | ✅             |
+
+**Recommendation:**
+
+- **Real-time streaming:** Keep Deepgram API (optimized for <300ms latency)
+- **Batch/accuracy:** Self-host Parakeet (50x faster than Whisper, better WER)
+- **Multi-language:** Parakeet v3 supports 25 European languages with auto-detection
+
+**Requirements:** NVIDIA GPU (A100/T4/V100), NeMo framework, 16kHz mono audio
+
+**Spokenly** ([spokenly.app](https://spokenly.app/)): macOS/iPhone dictation app using Parakeet & Whisper locally. Free for local models, $7.99/mo for cloud features. Good reference for UX patterns (100+ languages, Agent Mode for voice commands, real-time transcription).
 
 ### P3: Reliability & Polish
 
