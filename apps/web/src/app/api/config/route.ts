@@ -6,6 +6,9 @@ import { NextResponse } from "next/server";
  * Also exposes Clerk environment info for debugging auth issues.
  */
 export async function GET() {
+  // Build timestamp for deployment verification - 2026-01-11T14:15
+  const buildTimestamp = "2026-01-11T14:15";
+
   const publishableKey = process.env["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"] || "";
   const issuerUrl = process.env["CLERK_ISSUER_URL"] || "";
   const secretKeyPrefix = process.env["CLERK_SECRET_KEY"]?.slice(0, 8) || "";
@@ -18,6 +21,7 @@ export async function GET() {
   const clerkConfigValid = clerkMode === clerkSecretMode;
 
   return NextResponse.json({
+    buildTimestamp,
     apiUrl:
       process.env["NEXT_PUBLIC_CONTROL_PLANE_URL"] ||
       process.env["CONTROL_PLANE_URL"] ||
