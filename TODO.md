@@ -8,6 +8,80 @@ Long-term planning hub. Update when starting/completing work or discovering new 
 
 ## In Progress
 
+### P0: Google OAuth Sign-In (BLOCKING)
+
+**Problem:** Google sign-in fails with "Missing required parameter: client_id" - users can't log in.
+
+**Root cause:** Clerk production requires custom Google OAuth credentials configured in Clerk Dashboard.
+
+#### Setup Steps
+
+1. **Google Cloud Console - OAuth Consent Screen**
+   - URL: https://console.cloud.google.com/apis/credentials/consent?project=untethered-computer
+   - User type: External
+   - App name: `Untethered Computer`
+   - Support email: Need a non-personal email (see note below)
+   - Scopes: email, profile, openid
+
+2. **Google Cloud Console - Create OAuth Client**
+   - URL: https://console.cloud.google.com/apis/credentials/oauthclient?project=untethered-computer
+   - Application type: Web application
+   - Name: `Untethered Computer`
+   - Authorized redirect URI: `https://clerk.untethered.computer/v1/oauth_callback`
+
+3. **Clerk Dashboard - Add Credentials**
+   - URL: https://dashboard.clerk.com → Configure → SSO Connections → Google
+   - Paste Client ID and Client Secret from Google
+
+#### Email Issue
+
+Google OAuth consent screen requires a support email that's either:
+
+- Your logged-in Google account (shows personal name - not ideal)
+- A Google Group you own (free option)
+- A Google Workspace email (paid)
+
+**Quick fix:** Create a Google Group at https://groups.google.com/ and use that email.
+
+**Workaround done:** Set up `support@untethered.computer` via Cloudflare Email Routing → `seconds0.005@gmail.com`, but Google won't accept it for OAuth consent screen (needs Google-verified email).
+
+#### Tools Set Up
+
+- [x] gcloud CLI installed and authenticated
+- [x] Google Cloud project `untethered-computer` exists
+- [x] Cloudflare email routing: `support@untethered.computer` → `seconds0.005@gmail.com`
+- [x] Google Group created: `untethered-support@googlegroups.com`
+- [x] OAuth consent screen configured
+- [x] OAuth client credentials created (stored in Clerk Dashboard + Google Cloud Console)
+- [x] Credentials added to Clerk Dashboard
+- [x] Fixed Railway web service env vars (was using test keys!)
+- [ ] Test Google sign-in flow
+
+#### Root Cause Found
+
+**The web service on Railway had dev/test Clerk credentials** instead of production:
+
+- `CLERK_SECRET_KEY` was `sk_test_...` instead of `sk_live_...`
+- `CLERK_ISSUER_URL` was pointing to dev instance
+
+This caused OAuth to complete but sessions weren't recognized (credential mismatch).
+
+**Prevention:** Check `/api/config` endpoint - it now shows Clerk mode and validates config:
+
+```bash
+curl -s https://untethered.computer/api/config | jq '.clerk'
+# Should show: "mode": "live", "configValid": true
+```
+
+#### Credentials Location
+
+- **Google Cloud Console:** https://console.cloud.google.com/apis/credentials?project=untethered-computer
+- **Clerk Dashboard:** https://dashboard.clerk.com → SSO Connections → Google
+- **Client ID:** `44874166958-3mmn7vkok99ord7rn75h86umcq4761ll.apps.googleusercontent.com`
+- **Note:** Client Secret stored only in Clerk Dashboard (not in repo)
+
+---
+
 ### Billing System Setup (PR #10 merged, needs activation)
 
 **Goal:** Enable Stripe subscriptions and usage-based billing
