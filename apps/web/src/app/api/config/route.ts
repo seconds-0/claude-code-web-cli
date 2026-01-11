@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+// Force dynamic - this route reads runtime env vars
+export const dynamic = "force-dynamic";
+
 /**
  * API route to expose runtime configuration to client components.
  * This allows env vars to be read at runtime instead of build time.
