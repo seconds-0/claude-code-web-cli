@@ -37,8 +37,11 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider
-      signUpFallbackRedirectUrl="/dashboard/setup"
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
       signInFallbackRedirectUrl="/dashboard"
+      signUpFallbackRedirectUrl="/dashboard/setup"
+      afterSignOutUrl="/"
     >
       <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
         <body>{children}</body>
